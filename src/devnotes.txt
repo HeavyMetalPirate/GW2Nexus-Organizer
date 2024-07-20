@@ -1,0 +1,30 @@
+API Endpoints:
+
+https://wiki.guildwars2.com/wiki/API:2/account/dailycrafting in combination with https://wiki.guildwars2.com/wiki/API:2/dailycrafting
+https://wiki.guildwars2.com/wiki/API:2/account/dungeons in combination with https://wiki.guildwars2.com/wiki/API:2/dungeons
+https://wiki.guildwars2.com/wiki/API:2/account/mapchests in combination with https://wiki.guildwars2.com/wiki/API:2/mapchests
+https://wiki.guildwars2.com/wiki/API:2/account/worldbosses in combination with https://wiki.guildwars2.com/wiki/API:2/worldbosses
+https://wiki.guildwars2.com/wiki/API:2/account/achievements in combination with https://wiki.guildwars2.com/wiki/API:2/achievements/daily <<< this needs inspections because the daily API is broken right now, maybe we can learn from gw2efficiency
+https://wiki.guildwars2.com/wiki/API:2/account/wizardsvault/daily 
+https://wiki.guildwars2.com/wiki/API:2/account/wizardsvault/weekly
+https://wiki.guildwars2.com/wiki/API:2/account/raids in combination with https://wiki.guildwars2.com/wiki/API:2/raids
+
+
+Achievement stuffs:
+https://api.guildwars2.com/v2/achievements/categories?ids=<ids> => achievements array of ids => https://api.guildwars2.com/v2/achievements?ids=<ids> => possibly account/achievements?ids=... 
+and if missing then not complete and if found then check progress?
+or maybe account/achievements is broken and I can't find that?
+yeah looks like it will never show up... sadge no autocomplete for that I am afraid
+but how does blish check this? I am curious
+LMAO! Blish checks this by checking "are you in the map with the associated id and are leaving?" so it doesn't actually check the completion, it just assumes if you leave the instance you have completed it wtf
+So looks like auto completion of those is out of the question then
+
+Daily fractals: 88
+Daily LWS3 = 238
+Daily LWS4 = 243
+Daily Strikes = 250
+Daily EOD = 321
+Daily IBS = 330
+Weekly Fractals = 261
+Weekly WvW = 346			<< for some reason this only has 2 child achievements right now?
+Weekly Rifts = 365
