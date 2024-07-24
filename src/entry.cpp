@@ -28,8 +28,8 @@ void ProcessKeybind(const char* aIdentifier);
 void HandleIdentityChanged(void* eventArgs);
 void HandleAccountName(void* eventArgs);
 void HandleSelfJoin(void* eventArgs);
-void LoadSettings();
-void StoreSettings();
+void HandleTriggerDailyReset(void* eventArgs);
+void HandleTriggerWeeklyReset(void* eventArgs);
 
 /* globals */
 AddonDefinition AddonDef	= {};
@@ -82,7 +82,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
 	AddonDef.Version.Minor = 1;
-	AddonDef.Version.Build = 0;
+	AddonDef.Version.Build = 1;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
@@ -128,17 +128,20 @@ void AddonLoad(AddonAPI* aApi)
 	autoStartService.initialize();
 	autoStartService.startWorker();
 
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER", IDB_ICON, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_HOVER", IDB_ICON_HOVER, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_CLOSE", IDB_ICON_CLOSE, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_OPTIONS", IDB_ICON_OPTIONS, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_TRASH", IDB_ICON_TRASH, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_CHECK", IDB_ICON_CHECK, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_ADD", IDB_ICON_ADD, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_REPEAT", IDB_ICON_CLOCK, hSelf, nullptr);
+	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_REACTIVATE", IDB_ICON_REACTIVATE, hSelf, nullptr);
+	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_START", IDB_ICON_START, hSelf, nullptr);
+	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_EDIT", IDB_ICON_EDIT, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_SHORTCUT", IDB_ICON_SHORTCUT, hSelf, nullptr);
 	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_SHORTCUT_HOVER", IDB_ICON_SHORTCUT_HOVER, hSelf, nullptr);
-
+	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_NO_REPEAT", IDB_ICON_NO_REPEAT, hSelf, nullptr);
+	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_SAVE", IDB_ICON_SAVE, hSelf, nullptr);
+	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_CANCEL", IDB_ICON_CANCEL, hSelf, nullptr);
 
 	APIDefs->RegisterKeybindWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
 	APIDefs->AddShortcut("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
@@ -148,11 +151,14 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->SubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
 	APIDefs->SubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
 
+	APIDefs->SubscribeEvent(EV_NAME_DAILY_RESET, HandleTriggerDailyReset);
+	APIDefs->SubscribeEvent(EV_NAME_WEEKLY_RESET, HandleTriggerWeeklyReset);
+
 	// Add an options window and a regular render callback
 	APIDefs->RegisterRender(ERenderType_PreRender, AddonPreRender);
 	APIDefs->RegisterRender(ERenderType_Render, AddonRender);
 	APIDefs->RegisterRender(ERenderType_PostRender, AddonPostRender);
-	APIDefs->RegisterRender(ERenderType_OptionsRender, AddonOptions);
+	//APIDefs->RegisterRender(ERenderType_OptionsRender, AddonOptions);
 
 	APIDefs->RaiseEventNotification("EV_REQUEST_ACCOUNT_NAME"); // Request account name at load
 	APIDefs->RaiseEventNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
@@ -166,9 +172,11 @@ void AddonLoad(AddonAPI* aApi)
 ///----------------------------------------------------------------------------------------------------
 void AddonUnload()
 {
+	/* Stop components */
 	unloading = true;
 	apiTokenService.stopService();
 	autoStartService.endWorker();
+	organizerRepo->unload();
 
 	/* let's clean up after ourselves */
 	StoreSettings();
@@ -181,10 +189,13 @@ void AddonUnload()
 	APIDefs->UnsubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
 	APIDefs->UnsubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
 
+	APIDefs->UnsubscribeEvent(EV_NAME_DAILY_RESET, HandleTriggerDailyReset);
+	APIDefs->UnsubscribeEvent(EV_NAME_WEEKLY_RESET, HandleTriggerWeeklyReset);
+
 	APIDefs->DeregisterRender(AddonPreRender);
 	APIDefs->DeregisterRender(AddonRender);
 	APIDefs->DeregisterRender(AddonPostRender);
-	APIDefs->DeregisterRender(AddonOptions);
+	//APIDefs->DeregisterRender(AddonOptions);
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#ff0000>Signing off</c>, it was an honor commander.");
 }
@@ -205,76 +216,7 @@ void AddonRender()
 ///----------------------------------------------------------------------------------------------------
 void AddonOptions()
 {
-	ImGui::Separator();
-	static char newKeyBuffer[128] = "";
-	static char newDescriptionBuffer[256] = "";
-
-	ImGui::InputText("New API Key", newKeyBuffer, IM_ARRAYSIZE(newKeyBuffer));
-	ImGui::InputText("Identifier", newDescriptionBuffer, IM_ARRAYSIZE(newDescriptionBuffer));
-	ImGui::SameLine();
-	if (ImGui::Button("Add Key")) {
-		std::string newKey(newKeyBuffer);
-		std::string newDescription(newDescriptionBuffer);
-		if (!newKey.empty() && !newDescription.empty()) {
-			addon::ApiKey apiKey = { newKey, newDescription };
-			settings.apiKeys.push_back(apiKey);
-
-			newKeyBuffer[0] = '\0';  // Clear the input buffer
-			newDescriptionBuffer[0] = '\0';  // Clear the input buffer
-
-			StoreSettings();
-		}
-	}
-
-	// Display existing keys with descriptions and remove button in a table
-	ImGui::Separator();
-	if (ImGui::BeginTable("APIKeysTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
-		ImGui::TableSetupColumn("Identifier", 0, 0.1f);
-		ImGui::TableSetupColumn("API Key", 0, 0.6f);
-		ImGui::TableSetupColumn("Permissions", 0, 0.2f);
-		ImGui::TableSetupColumn("Actions", 0, 0.1f);
-		ImGui::TableHeadersRow();
-
-		for (auto it = settings.apiKeys.begin(); it != settings.apiKeys.end(); ) {
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			ImGui::Text("%s", it->identifier.c_str());
-			ImGui::TableSetColumnIndex(1);
-			ImGui::TextWrapped("%s", it->apiKey.c_str());
-			ImGui::TableSetColumnIndex(2);
-			
-			gw2::token::ApiToken* token = apiTokenService.getToken(it->identifier);
-			if (token != nullptr) {
-				std::stringstream stream;
-				for (auto perm : token->permissions) {
-					stream << perm << " ";
-				}
-				ImGui::TextWrapped("%s", stream.str().c_str());
-			}
-			else {
-				ImGui::TextWrapped("%s", "No token info available at this time.");
-			}
-			
-			ImGui::TableSetColumnIndex(3);
-			if (ImGui::Button(("Remove##" + it->identifier).c_str())) {
-				it = settings.apiKeys.erase(it);  // Remove the key and get the next iterator
-				StoreSettings();
-			}
-			else {
-				++it;  // Move to the next iterator
-			}
-		}
-
-		ImGui::EndTable();
-	}
-	ImGui::Separator();
-	if (ImGui::Button("Trigger Daily Reset")) {
-		autoStartService.PerformDailyReset();
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Trigger Weekly Reset")) {
-		autoStartService.PerformWeeklyReset();
-	}
+	// TODO impl
 }
 
 void AddonSimpleShortcut() {
@@ -326,31 +268,9 @@ void HandleSelfJoin(void* eventArgs) {
 		accountName = accountName.substr(1);
 }
 
-void LoadSettings() {
-	std::string pathData = getAddonFolder() + "/settings.json";
-	if (fs::exists(pathData)) {
-		std::ifstream dataFile(pathData);
-
-		if (dataFile.is_open()) {
-			json jsonData;
-			dataFile >> jsonData;
-			dataFile.close();
-			// parse settings, yay
-			settings = jsonData;
-		}
-	}
+void HandleTriggerDailyReset(void* eventArgs) {
+	autoStartService.PerformDailyReset();
 }
-
-void StoreSettings() {
-	json j = settings;
-
-	std::string pathData = getAddonFolder() + "/settings.json";
-	std::ofstream outputFile(pathData);
-	if (outputFile.is_open()) {
-		outputFile << j.dump(4) << std::endl;
-		outputFile.close();
-	}
-	else {
-		APIDefs->Log(ELogLevel_WARNING, ADDON_NAME, "Could not store settings.json - configuration might get lost between loads.");
-	}
+void HandleTriggerWeeklyReset(void* eventArgs) {
+	autoStartService.PerformWeeklyReset();
 }

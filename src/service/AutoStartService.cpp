@@ -23,12 +23,12 @@ void AutoStartService::initialize() {
         PerformDailyReset();
         PerformWeeklyReset();
     });
-    initializer.detach();
+    //initializer.detach();
 }
 void AutoStartService::startWorker() {
 	running = true;
 	worker = std::thread(&AutoStartService::CheckResetTimes, this);
-    worker.detach();
+    //worker.detach();
 }
 void AutoStartService::endWorker() {
 	running = false;
@@ -102,15 +102,15 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, ("Item: " + item->title + " with id " + std::to_string(item->id)).c_str());
         APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, ("Flags: deleted = " + std::to_string(item->deleted) + ", repeatMode = " + std::string(RepeatModeValue(mode))).c_str());
 #endif
-
         if (item->deleted) continue; // task does not technically exist anymore
-        if (item->repeatMode != mode) continue; // not daily
+        if (item->repeatMode != mode) continue; // not the correct mode
+        if (!item->accountConfiguration.contains(account)) continue; // no subscription data
+        if (!item->accountConfiguration[account]) continue; // not subscribed on that account
 
         bool startTask = true;
         // Check all existing instances on whether we may start the task
         for (auto instance : organizerRepo->getTaskInstances()) {
             if (instance->itemId != item->id) continue; // not of this type
-            if (instance->deleted) continue; // ignore deleted instances anyways
             if (!strContains(instance->owner, account)) continue; // not the owner of the instance
 
             // At this point we know the instance is of the right type
@@ -122,9 +122,9 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
                 break; // not finished yet on this account
             }
 
-            // If the instance is not open but completed, check if the completion date was "since last reset"
+            // If the instance is not open but completed or deleted, check if the begin date was "since last reset"
             std::chrono::time_point lastReset = mode == RepeatMode::DAILY ? getLastDailyReset() : getLastWeeklyReset();
-            if (instance->completed && parse_date(instance->startDate) >= lastReset) {
+            if ((instance->completed || instance->deleted) && parse_date(instance->startDate) >= lastReset) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + item->title + "' already completed since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;
@@ -144,14 +144,14 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
 
     // the same for API Tasks
     for (auto apiTask : organizerRepo->getApiTaskConfigurables()) {
-        if (!apiTask->active) continue;
-        if (apiTask->item.repeatMode != mode) continue;
+        if (!apiTask->accountConfiguration.contains(account)) continue; // no subscription data
+        if (!apiTask->accountConfiguration[account]) continue; // not subscribed
+        if (apiTask->item.repeatMode != mode) continue; // wrong repeat mode
 
         bool startTask = true;
         // Check all existing instances on whether we may start the task
         for (auto instance : organizerRepo->getTaskInstances()) {
             if (instance->itemId != apiTask->item.id) continue; // not of this type
-            if (instance->deleted) continue; // ignore deleted instances anyways
             if (!strContains(instance->owner, account)) continue; // not the owner of the instance
 
             // At this point we know the instance is of the right type
@@ -165,7 +165,7 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
 
             // If the instance is not open but completed, check if the completion date was "since last reset"
             std::chrono::time_point lastReset = mode == RepeatMode::DAILY ? getLastDailyReset() : getLastWeeklyReset();
-            if (instance->completed && parse_date(instance->startDate) >= lastReset) {
+            if ((instance->completed && instance->deleted) && parse_date(instance->startDate) >= lastReset) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + apiTask->item.title + "' already completed since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;

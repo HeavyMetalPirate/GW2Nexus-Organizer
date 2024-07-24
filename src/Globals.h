@@ -95,4 +95,33 @@ inline std::string getAddonFolder() {
 	return pathFolder;
 }
 
+inline void LoadSettings() {
+	std::string pathData = getAddonFolder() + "/settings.json";
+	if (fs::exists(pathData)) {
+		std::ifstream dataFile(pathData);
+
+		if (dataFile.is_open()) {
+			json jsonData;
+			dataFile >> jsonData;
+			dataFile.close();
+			// parse settings, yay
+			settings = jsonData;
+		}
+	}
+}
+
+inline void StoreSettings() {
+	json j = settings;
+
+	std::string pathData = getAddonFolder() + "/settings.json";
+	std::ofstream outputFile(pathData);
+	if (outputFile.is_open()) {
+		outputFile << j.dump(4) << std::endl;
+		outputFile.close();
+	}
+	else {
+		APIDefs->Log(ELogLevel_WARNING, ADDON_NAME, "Could not store settings.json - configuration might get lost between loads.");
+	}
+}
+
 #endif // GLOBALS_H

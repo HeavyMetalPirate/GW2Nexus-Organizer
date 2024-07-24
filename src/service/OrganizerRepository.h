@@ -10,6 +10,7 @@ public:
 	/// Function to initialize the repository from storage
 	/// </summary>
 	void initialize();
+	void unload();
 
 	/// <summary>
 	/// Function to save data to storage
@@ -66,7 +67,6 @@ private:
 	int getNextTaskInstanceId();
 	int getNextApiTaskConfigurableId();
 
-
 	// Tasks et al
 	std::vector<OrganizerItem*> configurableItems = std::vector<OrganizerItem*>();
 	std::vector<ApiTaskConfigurable*> apiTaskConfigurables = std::vector<ApiTaskConfigurable*>();
@@ -75,6 +75,8 @@ private:
 	std::map<std::string, std::vector<std::string>> progressionPerAccount = std::map<std::string, std::vector<std::string>>();
 	
 	std::thread initializerThread;
+
+	std::vector<std::thread*> threadPool = std::vector<std::thread*>();
 };
 
 #endif

@@ -4,11 +4,13 @@
 /* render proto */
 void renderOrganizer();
 void renderTodoList();
-/* Component proto */
+/* Component tabs proto */
 void renderCurrentTasks();
 void renderDoneTasks();
 void renderTaskConfiguration();
 void renderAPITasks();
+void renderSettings();
+/* Misc rendering proto */
 void renderNewTaskDialog();
 
 /* control flags */        
@@ -24,6 +26,8 @@ OrganizerItem* changeIntervalItem = nullptr;
 OrganizerItemInstance newInstance = {};
 
 OrganizerItem* editItem = nullptr;
+
+std::string newTaskName;
 
 bool displayOwnOnly = true;
 
@@ -42,10 +46,20 @@ Texture* iconTrash = nullptr;
 Texture* iconCheck = nullptr;
 Texture* iconAdd = nullptr;
 Texture* iconRepeat = nullptr;
+Texture* iconNoRepeat = nullptr;
+Texture* iconReactivate = nullptr;
+Texture* iconStart = nullptr;
+Texture* iconEdit = nullptr;
+Texture* iconSave = nullptr;
+Texture* iconCancel = nullptr;
 
 /* Pagination */
-int itemsPerPage = 25;
-int currentPage = 1;
+static const char* itemsPerPageComboItems[] = { "10", "25", "50" };
+int doneItemsPerPage = 10;
+int doneCurrentPage = 1;
+int configItemsPerPage = 10;
+int configCurrentPage = 1;
+
 
 void Renderer::preRender() {
     if (iconClose == nullptr)
@@ -60,7 +74,18 @@ void Renderer::preRender() {
         iconAdd = APIDefs->GetTexture("ICON_ORGANIZER_ADD");
     if (iconRepeat == nullptr)
         iconRepeat = APIDefs->GetTexture("ICON_ORGANIZER_REPEAT");
-
+    if (iconReactivate == nullptr)
+        iconReactivate = APIDefs->GetTexture("ICON_ORGANIZER_REACTIVATE");
+    if (iconStart == nullptr)
+        iconStart = APIDefs->GetTexture("ICON_ORGANIZER_START");
+    if (iconEdit == nullptr)
+        iconEdit = APIDefs->GetTexture("ICON_ORGANIZER_EDIT");
+    if (iconNoRepeat == nullptr)
+        iconNoRepeat = APIDefs->GetTexture("ICON_ORGANIZER_NO_REPEAT");
+    if (iconSave == nullptr)
+        iconSave = APIDefs->GetTexture("ICON_ORGANIZER_SAVE");
+    if (iconCancel == nullptr)
+        iconCancel = APIDefs->GetTexture("ICON_ORGANIZER_CANCEL");
 
     if (accountName.empty()) displayOwnOnly = false;
 }
@@ -172,6 +197,7 @@ void renderNewTaskDialog() {
 void renderTodoList() {
     if (!todoListRendered) return;
 
+    ImGui::SetNextWindowSize(ImVec2(370.0f, 350.0f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("TODOs", &todoListRendered, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar
                                                 | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
         // Render custom title bar first... sigh
@@ -190,7 +216,6 @@ void renderTodoList() {
                 newInstance.startDate = format_date(std::chrono::system_clock::now());
                 newInstance.endDate = "";
                 newInstance.completed = false;
-
             }
         }
         else {
@@ -231,13 +256,56 @@ void renderTodoList() {
         ImGui::Separator();
         
         // Finally, content.
-        char bufferTaskFilter[256];
-        strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
-        if (ImGui::InputText("Filter", bufferTaskFilter, sizeof(bufferTaskFilter))) {
-            tableFilter = bufferTaskFilter;
+        char bufferNewTask[256];
+        strncpy_s(bufferNewTask, newTaskName.c_str(), sizeof(bufferNewTask));
+        if (ImGui::InputText("##TaskName", bufferNewTask, sizeof(bufferNewTask))) {
+            newTaskName = bufferNewTask;
         }
-        if (!accountName.empty()) {
-            ImGui::Checkbox("Show only tasks of this account", &displayOwnOnly);
+        ImGui::SameLine();
+        if (ImGui::Button("Create Task")) {
+            if (!newTaskName.empty()) {
+                newItem = {};
+                newItem.title = newTaskName;
+                newItem.description = "";
+                newItem.type = ItemType::DEFAULT;
+                newItem.repeatMode = RepeatMode::ONCE;
+
+                newInstance = {};
+                newInstance.startDate = format_date(std::chrono::system_clock::now());
+                newInstance.endDate = "";
+                newInstance.completed = false;
+
+                OrganizerItem* newCategory = new OrganizerItem(newItem);
+                organizerRepo->addConfigurableItem(newCategory);
+                newInstance.itemId = newCategory->id;
+
+                // Set owner of the task
+                if (accountName.empty() && characterName.empty()) {
+                    newInstance.owner = "-";
+                }
+                else if (characterName.empty()) {
+                    newInstance.owner = accountName;
+                }
+                else {
+                    newInstance.owner = characterName + "\n" + accountName;
+                }
+
+                organizerRepo->addTaskInstance(new OrganizerItemInstance(newInstance));
+                newItem = {};
+                newInstance = {};
+                newTaskName = "";
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Filter")) {
+            char bufferTaskFilter[256];
+            strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
+            if (ImGui::InputText("Filter", bufferTaskFilter, sizeof(bufferTaskFilter))) {
+                tableFilter = bufferTaskFilter;
+            }
+            if (!accountName.empty()) {
+                ImGui::Checkbox("Show only tasks of this account", &displayOwnOnly);
+            }
         }
         ImGui::Separator();
 
@@ -245,7 +313,7 @@ void renderTodoList() {
             ImVec2 window_size = ImGui::GetWindowSize();
             float table_width = window_size.x;
             float rightColumnWidth = 25.0f;
-            float leftColumnWidth = table_width - (2 * rightColumnWidth) - 25.0;
+            float leftColumnWidth = table_width - (2 * rightColumnWidth) - 25.0f;
             if (ImGui::GetCurrentWindow()->ScrollbarY) {
                 leftColumnWidth -= 10.0f;
             }
@@ -283,7 +351,8 @@ void renderTodoList() {
                         // not a GW2 API Item => eligible for interval changes on the spot
                         if (iconRepeat != nullptr) {
                             ImGui::PushID(hashString("changeinterval_" + std::to_string(task->id)));
-                            if (ImGui::ImageButton((ImTextureID)iconRepeat->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                            ImTextureID buttonTex = item->repeatMode == RepeatMode::ONCE ? iconNoRepeat->Resource : iconRepeat->Resource;
+                            if (ImGui::ImageButton(buttonTex, { 20,20 }, { 0,0 }, { 1,1 })) {
                                 renderChangeInterval = true;
                                 changeIntervalPos = ImGui::GetMousePos();
                                 changeIntervalItem = item;
@@ -345,6 +414,13 @@ void renderTodoList() {
                         }
                         ImGui::EndTooltip();
                     }
+                    /* TODO might use this, might not
+                    switch (item->repeatMode) {
+                        case RepeatMode::DAILY: ImGui::Text("(daily)"); break;
+                        case RepeatMode::WEEKLY: ImGui::Text("(weekly)"); break;
+                        default: ImGui::Text("");
+                    } 
+                    */
 
                     ImGui::TableNextColumn(); // Finish button
                     if (iconCheck != nullptr) {
@@ -380,6 +456,12 @@ void renderTodoList() {
             for (int i = 0; i < static_cast<int>(RepeatMode::COUNT); ++i) {
                 RepeatMode currentEnum = static_cast<RepeatMode>(i);
                 if (ImGui::Button(RepeatModeValue(currentEnum), { 150,20 })) {
+                    if (!changeIntervalItem->accountConfiguration.contains(accountName) && !accountName.empty()) {
+                        changeIntervalItem->accountConfiguration.emplace(accountName, currentEnum == RepeatMode::ONCE ? false : true);
+                    }
+                    else if(!accountName.empty()) {
+                        changeIntervalItem->accountConfiguration[accountName] = currentEnum == RepeatMode::ONCE ? false : true;
+                    }
                     changeIntervalItem->repeatMode = currentEnum;
                     organizerRepo->save();
                     changeIntervalItem = nullptr;
@@ -398,10 +480,11 @@ void renderOrganizer() {
     if (!organizerRendered) return;
 
     // Create the main window
+    ImGui::SetNextWindowSize(ImVec2(960.0f, 770.0f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Organizer", &organizerRendered, ImGuiWindowFlags_NoCollapse)) {
 
         // Create a child window for the tab bar on the left
-        ImGui::BeginChild("Left Pane", ImVec2(150, 0), true);
+        ImGui::BeginChild("Left Pane", ImVec2(140, 0), true);
 
         // Render vertical card-style tabs
 
@@ -409,6 +492,7 @@ void renderOrganizer() {
         if (CardTab("Ingame activities", selected_tab == 1)) selected_tab = 1;
         if (CardTab("Completed Tasks", selected_tab == 2)) selected_tab = 2;
         if (CardTab("Task configuration", selected_tab == 3)) selected_tab = 3;
+        if (CardTab("Settings", selected_tab == 4)) selected_tab = 4;
 
         ImGui::EndChild();
 
@@ -416,22 +500,13 @@ void renderOrganizer() {
         ImGui::SameLine();
         ImGui::BeginChild("Right Pane", ImVec2(0, 0), true);
 
-        // Render content based on the selected tab
-        if (selected_tab == 0)
-        {
-            renderCurrentTasks();
-        }
-        else if (selected_tab == 1)
-        {
-            renderAPITasks();
-        }
-        else if (selected_tab == 2)
-        {
-            renderDoneTasks();
-        }
-        else if (selected_tab == 3)
-        {
-            renderTaskConfiguration();
+        switch (selected_tab) {
+            case 0: renderCurrentTasks(); break;
+            case 1: renderAPITasks(); break;
+            case 2: renderDoneTasks(); break;
+            case 3: renderTaskConfiguration(); break;
+            case 4: renderSettings(); break;
+            default: ImGui::Text(("Unknown Tab: " + std::to_string(selected_tab)).c_str());
         }
 
         ImGui::EndChild();
@@ -548,15 +623,15 @@ void renderCurrentTasks() {
         tableFilter = bufferTaskFilter;
     }
 
-    if (ImGui::BeginTable("CurrentTasksTable", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
-        ImGui::TableSetupColumn("Title", 0, 0.3f);
-        ImGui::TableSetupColumn("Description", 0, 0.0f);
-        ImGui::TableSetupColumn("Type", 0, 0.2f);
-        ImGui::TableSetupColumn("Owner", 0, 0.4f);
-        ImGui::TableSetupColumn("Started", 0, 0.2f);
-        ImGui::TableSetupColumn("Due", 0, 0.2f);
-        ImGui::TableSetupColumn("##Complete", 0, 0.2f);
-        ImGui::TableSetupColumn("##Delete", 0, 0.2f);
+    if (ImGui::BeginTable("CurrentTasksTable", 8, ImGuiTableFlags_Borders)) {
+        ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+        ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("Owner", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn("Started", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableSetupColumn("Due", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableSetupColumn("##Complete", ImGuiTableColumnFlags_WidthFixed, 25.0f);
+        ImGui::TableSetupColumn("##Delete", ImGuiTableColumnFlags_WidthFixed, 25.0f);
 
         ImGui::TableHeadersRow();
 
@@ -583,7 +658,7 @@ void renderCurrentTasks() {
             ImGui::TableNextColumn(); 
             ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->description.c_str());
             ImGui::TableNextColumn();
-            ImGui::Text(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
+            ImGui::TextWrapped(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
             ImGui::TableNextColumn(); 
             ImGui::Text(task->owner.c_str());
             ImGui::TableNextColumn(); 
@@ -604,16 +679,47 @@ void renderCurrentTasks() {
                     ImGui::Text(format_date_output(task->endDate).c_str());
                 }
             }
-            ImGui::TableNextColumn(); 
-            if (ImGui::Button(("Complete##" + std::to_string(task->id)).c_str())) {
-                task->completed = true;
-                task->completionDate = format_date(std::chrono::system_clock::now());
-                organizerRepo->save();
+            ImGui::TableNextColumn(); // Finish button
+            if (iconCheck != nullptr) {
+                ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
+                if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    task->completionDate = format_date(std::chrono::system_clock::now());
+                    task->completed = true;
+                    organizerRepo->save();
+                }
+                ImGui::PopID();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Complete Task");
+                    ImGui::EndTooltip();
+                }
             }
-            ImGui::TableNextColumn(); 
-            if (ImGui::Button(("Remove##" + std::to_string(task->id)).c_str())) {
-                task->deleted = true;
-                organizerRepo->save();
+            else {
+                if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), { 20,20 })) {
+                    task->completionDate = format_date(std::chrono::system_clock::now());
+                    task->completed = true;
+                    organizerRepo->save();
+                }
+            }
+            ImGui::TableNextColumn(); // Delete button
+            if (iconTrash != nullptr) {
+                ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
+                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    task->deleted = true;
+                    organizerRepo->save();
+                }
+                ImGui::PopID();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Delete Task");
+                    ImGui::EndTooltip();
+                }
+            }
+            else {
+                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), {20,20})) {
+                    task->deleted = true;
+                    organizerRepo->save();
+                }
             }
         }
         ImGui::EndTable();
@@ -622,16 +728,44 @@ void renderCurrentTasks() {
 void renderAPITasks() {
 
     if (ImGui::CollapsingHeader("Wizards Vault")) {
+        ImGui::SetCursorPosX(30);
+        ApiTaskConfigurable* dailyWv = organizerRepo->getApiTaskConfigurableByOriginalId("wizardsvault_daily");
+        if (dailyWv == nullptr) {
+            ImGui::Text("Daily Meta achievement tracking not available at this time!");
+        }
+        else {
+            if (dailyWv->accountConfiguration.count(accountName) == 0) {
+                dailyWv->accountConfiguration.emplace(accountName, false);
+            }
+            if (ImGui::Checkbox("Auto track daily meta achievement", &dailyWv->accountConfiguration[accountName])) {
+                organizerRepo->save();
+                APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+            }
+        }
+        ImGui::SetCursorPosX(30);
+        ApiTaskConfigurable* weeklyWv = organizerRepo->getApiTaskConfigurableByOriginalId("wizardsvault_weekly");
+        if (weeklyWv == nullptr || accountName.empty()) {
+            ImGui::Text("Weekly Meta achievement tracking not available at this time!");
+        }
+        else {
+            if (weeklyWv->accountConfiguration.count(accountName) == 0) {
+                weeklyWv->accountConfiguration.emplace(accountName, false);
+            }
+            if (ImGui::Checkbox("Auto track weekly meta achievement", &weeklyWv->accountConfiguration[accountName])) {
+                organizerRepo->save();
+                APIDefs->RaiseEventNotification(EV_NAME_WEEKLY_RESET);
+            }
+        }
+
         for (auto progress : organizerRepo->wizardsVaultDaily) {
             ImGui::SetCursorPosX(30);
             if (ImGui::CollapsingHeader(("Progress for account: " + progress.first).c_str())) {
                 ImGui::SetCursorPosX(30);
-                if (ImGui::BeginTable(("WizardVaultTable" + progress.first).c_str(), 5, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
+                if (ImGui::BeginTable(("WizardVaultTable" + progress.first).c_str(), 4, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
                     ImGui::TableSetupColumn("Title", 0, 0.6f);
                     ImGui::TableSetupColumn("Track", 0, 0.05f);
                     ImGui::TableSetupColumn("Progress", 0, 0.15f);
                     ImGui::TableSetupColumn("Status", 0, 0.15f);
-                    ImGui::TableSetupColumn("##AutoTrack", 0, 0.15f);
                     ImGui::TableHeadersRow();
 
                     ImGui::TableNextRow();
@@ -643,8 +777,7 @@ void renderAPITasks() {
                     ImGui::Text((std::to_string(progress.second.meta_progress_current) + "/" + std::to_string(progress.second.meta_progress_complete)).c_str());
                     ImGui::TableNextColumn();
                     ImGui::Text(progress.second.meta_reward_claimed ? "Claimed" : "Unclaimed");
-                    ImGui::TableNextColumn();
-                    ImGui::Text(""); // TODO auto track button feasible?
+                   
                     
                     for (auto objective : progress.second.objectives) {
                         ImGui::TableNextRow();
@@ -656,8 +789,6 @@ void renderAPITasks() {
                         ImGui::Text((std::to_string(objective.progress_current) + "/" + std::to_string(objective.progress_complete)).c_str());
                         ImGui::TableNextColumn();
                         ImGui::Text(objective.claimed ? "Claimed" : "Unclaimed");
-                        ImGui::TableNextColumn();
-                        ImGui::Text(""); // TODO auto track button feasible?
                     }
 
                     if (organizerRepo->wizardsVaultWeekly.count(progress.first)) {
@@ -674,11 +805,6 @@ void renderAPITasks() {
                         ImGui::Text((std::to_string(weeklyProgress.meta_progress_current) + "/" + std::to_string(weeklyProgress.meta_progress_complete)).c_str());
                         ImGui::TableNextColumn();
                         ImGui::Text(weeklyProgress.meta_reward_claimed ? "Claimed" : "Unclaimed");
-                        ImGui::TableNextColumn();
-                        bool temp = false;
-                        if (ImGui::Checkbox(("Auto track##trackwvweekly_" + progress.first).c_str(), &temp)) { // TODO actual settings which recipes are tracked
-                            // TODO if checked, create configurable item (if not exists) + task instance (if no instance exists for the day for that account, no matter if done or open)
-                        }
 
                         for (auto objective : weeklyProgress.objectives) {
                             ImGui::TableNextRow();
@@ -690,11 +816,6 @@ void renderAPITasks() {
                             ImGui::Text((std::to_string(objective.progress_current) + "/" + std::to_string(objective.progress_complete)).c_str());
                             ImGui::TableNextColumn();
                             ImGui::Text(objective.claimed ? "Claimed" : "Unclaimed");
-                            ImGui::TableNextColumn();
-                            bool temp = false;
-                            if (ImGui::Checkbox(("Auto track##trackwvweekly_" + progress.first + "-" + std::to_string(objective.id)).c_str(), &temp)) { // TODO actual settings which recipes are tracked
-                                // TODO if checked, create configurable item (if not exists) + task instance (if no instance exists for the day for that account, no matter if done or open)
-                            }
                         }
                     }
 
@@ -711,11 +832,14 @@ void renderAPITasks() {
                 
                 ImGui::SetCursorPosX(30);
                 ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId("achievement_group_" + std::to_string(category.first.id));
-                if (configurable == nullptr) {
+                if (configurable == nullptr || accountName.empty()) {
                     // NO OP
                 }
                 else {
-                    if (ImGui::Checkbox(("Track all achievements for category " + category.first.name).c_str(), &configurable->active)) {
+                    if (configurable->accountConfiguration.count(accountName) == 0) {
+                        configurable->accountConfiguration.emplace(accountName, false);
+                    }
+                    if (ImGui::Checkbox(("Track all achievements for category " + category.first.name).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
                     }
                 }
@@ -735,11 +859,14 @@ void renderAPITasks() {
                         ImGui::TableNextColumn();
 
                         ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId("achievement_single_" + std::to_string(achievement.id));
-                        if (configurable == nullptr) {
+                        if (configurable == nullptr || accountName.empty()) {
                             ImGui::Text("n/a");
                         }
                         else {
-                            if (ImGui::Checkbox(("Auto track##track_" + std::to_string(achievement.id)).c_str(), &configurable->active)) {
+                            if (configurable->accountConfiguration.count(accountName) == 0) {
+                                configurable->accountConfiguration.emplace(accountName, false);
+                            }
+                            if (ImGui::Checkbox(("Auto track##track_" + std::to_string(achievement.id)).c_str(), &configurable->accountConfiguration[accountName])) {
                                 organizerRepo->save();
                             }
                         }
@@ -779,12 +906,16 @@ void renderAPITasks() {
                 }
                 ImGui::TableNextColumn();
                 ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(craftable);
-                if (configurable == nullptr) {
+                if (configurable == nullptr || accountName.empty()) {
                     ImGui::Text("n/a");
                 }
                 else {
-                    if (ImGui::Checkbox(("Auto track##track_" + craftable).c_str(), &configurable->active)) {
+                    if (configurable->accountConfiguration.count(accountName) == 0) {
+                        configurable->accountConfiguration.emplace(accountName, false);
+                    }
+                    if (ImGui::Checkbox(("Auto track##track_" + craftable).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
+                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
                     }
                 }
             }
@@ -823,12 +954,16 @@ void renderAPITasks() {
                 ImGui::TableNextColumn();
 
                 ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(meta);
-                if (configurable == nullptr) {
+                if (configurable == nullptr || accountName.empty()) {
                     ImGui::Text("n/a");
                 }
                 else {
-                    if (ImGui::Checkbox(("Auto track##track_" + meta).c_str(), &configurable->active)) {
+                    if (configurable->accountConfiguration.count(accountName) == 0) {
+                        configurable->accountConfiguration.emplace(accountName, false);
+                    }
+                    if (ImGui::Checkbox(("Auto track##track_" + meta).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
+                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
                     }
                 }
             }
@@ -866,12 +1001,16 @@ void renderAPITasks() {
                 }
                 ImGui::TableNextColumn();
                 ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(boss);
-                if (configurable == nullptr) {
+                if (configurable == nullptr || accountName.empty()) {
                     ImGui::Text("n/a");
                 }
                 else {
-                    if (ImGui::Checkbox(("Auto track##track_" + boss).c_str(), &configurable->active)) {
+                    if (configurable->accountConfiguration.count(accountName) == 0) {
+                        configurable->accountConfiguration.emplace(accountName, false);
+                    }
+                    if (ImGui::Checkbox(("Auto track##track_" + boss).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
+                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
                     }
                 }
             }
@@ -886,12 +1025,16 @@ void renderAPITasks() {
             if (ImGui::CollapsingHeader(dungeonTranslator.at(dungeon.id).c_str())) {
                 ImGui::SetCursorPosX(30);
                 ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(dungeon.id);
-                if (configurable == nullptr) {
+                if (configurable == nullptr || accountName.empty()) {
                     // NO OP
                 }
                 else {
-                    if (ImGui::Checkbox(("Track all paths of " + dungeonTranslator.at(dungeon.id)).c_str(), &configurable->active)) {
+                    if (configurable->accountConfiguration.count(accountName) == 0) {
+                        configurable->accountConfiguration.emplace(accountName, false);
+                    }
+                    if (ImGui::Checkbox(("Track all paths of " + dungeonTranslator.at(dungeon.id)).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
+                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
                     }
                 }
                 ImGui::SetCursorPosX(30);
@@ -924,12 +1067,16 @@ void renderAPITasks() {
                         }
                         ImGui::TableNextColumn();
                         ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(path.id);
-                        if (configurable == nullptr) {
+                        if (configurable == nullptr || accountName.empty()) {
                             // NO OP
                         }
                         else {
-                            if (ImGui::Checkbox(("Auto track##track_" + path.id).c_str(), &configurable->active)) {
+                            if (configurable->accountConfiguration.count(accountName) == 0) {
+                                configurable->accountConfiguration.emplace(accountName, false);
+                            }
+                            if (ImGui::Checkbox(("Auto track##track_" + path.id).c_str(), &configurable->accountConfiguration[accountName])) {
                                 organizerRepo->save();
+                                APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
                             }
                         }
                     }
@@ -946,12 +1093,16 @@ void renderAPITasks() {
                 if (ImGui::CollapsingHeader(raidTranslator.at(wing.id).c_str())) {
                     ImGui::SetCursorPosX(30);
                     ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(wing.id);
-                    if (configurable == nullptr) {
+                    if (configurable == nullptr || accountName.empty()) {
                         // NO OP
                     }
                     else {
-                        if (ImGui::Checkbox(("Track all bosses of " + raidTranslator.at(wing.id)).c_str(), &configurable->active)) {
+                        if (configurable->accountConfiguration.count(accountName) == 0) {
+                            configurable->accountConfiguration.emplace(accountName, false);
+                        }
+                        if (ImGui::Checkbox(("Track all bosses of " + raidTranslator.at(wing.id)).c_str(), &configurable->accountConfiguration[accountName])) {
                             organizerRepo->save();
+                            APIDefs->RaiseEventNotification(EV_NAME_WEEKLY_RESET);
                         }
                     }
                     ImGui::SetCursorPosX(30);
@@ -982,12 +1133,16 @@ void renderAPITasks() {
                             }
                             ImGui::TableNextColumn();
                             ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId(boss.id);
-                            if (configurable == nullptr) {
+                            if (configurable == nullptr || accountName.empty()) {
                                 // NO OP
                             }
                             else {
-                                if (ImGui::Checkbox(("Auto track##track_" + boss.id).c_str(), &configurable->active)) {
-                                    organizerRepo->save();
+                                if (configurable->accountConfiguration.count(accountName) == 0) {
+                                    configurable->accountConfiguration.emplace(accountName, false);
+                                }
+                                if (ImGui::Checkbox(("Auto track##track_" + boss.id).c_str(), &configurable->accountConfiguration[accountName])) {
+                                    organizerRepo->save(); 
+                                    APIDefs->RaiseEventNotification(EV_NAME_WEEKLY_RESET);
                                 }
                             }
                         }
@@ -1007,18 +1162,18 @@ void renderDoneTasks() {
     }
 
     int totalAvailableTasks = 0;
-    int startAtTaskCount = (currentPage - 1) * itemsPerPage;
-    int endAtTaskCount = currentPage * itemsPerPage;
+    int startAtTaskCount = (doneCurrentPage - 1) * doneItemsPerPage;
+    int endAtTaskCount = doneCurrentPage * doneItemsPerPage;
 
-    if (ImGui::BeginTable("DoneTasksTable", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
-        ImGui::TableSetupColumn("Title", 0, 0.3f);
-        ImGui::TableSetupColumn("Description", 0, 0.0f);
-        ImGui::TableSetupColumn("Type", 0, 0.2f);
-        ImGui::TableSetupColumn("Owner", 0, 0.4f);
-        ImGui::TableSetupColumn("Started", 0, 0.2f);
-        ImGui::TableSetupColumn("Completed", 0, 0.2f);
-        ImGui::TableSetupColumn("##Complete", 0, 0.2f);
-        ImGui::TableSetupColumn("##Delete", 0, 0.2f);
+    if (ImGui::BeginTable("DoneTasksTable", 8, ImGuiTableFlags_Borders)) {
+        ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+        ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("Owner", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn("Started", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableSetupColumn("Completed", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableSetupColumn("##Reactivate", ImGuiTableColumnFlags_WidthFixed, 25.0f);
+        ImGui::TableSetupColumn("##Delete", ImGuiTableColumnFlags_WidthFixed, 25.0f);
 
         ImGui::TableHeadersRow();
 
@@ -1050,7 +1205,7 @@ void renderDoneTasks() {
             ImGui::TableNextColumn(); 
             ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->description.c_str());
             ImGui::TableNextColumn(); 
-            ImGui::Text(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
+            ImGui::TextWrapped(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
             ImGui::TableNextColumn(); 
             ImGui::TextWrapped(task->owner.c_str());
             ImGui::TableNextColumn(); 
@@ -1058,39 +1213,69 @@ void renderDoneTasks() {
             ImGui::TableNextColumn(); 
             ImGui::Text(format_date_output(task->completionDate).c_str());
             ImGui::TableNextColumn(); 
-            if (ImGui::Button(("Reactivate##" + std::to_string(task->id)).c_str())) {
-                task->completed = false;
-                task->completionDate = "";
-                organizerRepo->save();
+            if (iconReactivate != nullptr) {
+                ImGui::PushID(hashString("react_" + std::to_string(task->id)));
+                if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    task->completed = false;
+                    task->completionDate = "";
+                    organizerRepo->save();
+                }
+                ImGui::PopID();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Reactivate Task");
+                    ImGui::EndTooltip();
+                }
+            }
+            else {
+                if (ImGui::Button(("Reactivate##" + std::to_string(task->id)).c_str())) {
+                    task->completed = false;
+                    task->completionDate = "";
+                    organizerRepo->save();
+                }
             }
             ImGui::TableNextColumn(); 
-            if (ImGui::Button(("Remove##" + std::to_string(task->id)).c_str())) {
-                task->deleted = true;
-                organizerRepo->save();
+            if (iconTrash != nullptr) {
+                ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
+                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    task->deleted = true;
+                    organizerRepo->save();
+                }
+                ImGui::PopID();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Delete Task");
+                    ImGui::EndTooltip();
+                }
+            }
+            else {
+                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), { 20,20 })) {
+                    task->deleted = true;
+                    organizerRepo->save();
+                }
             }
         }
         ImGui::EndTable();
     }
 
     // I expect this table to get quite populated quite fast so TODO:
-    // - add a drop down "Show last 25, 50, 100"
+    // - add a drop down "Show last 10, 25, 50"
     // - add pagination
-    int currentIndex = itemsPerPage == 25 ? 0 : itemsPerPage == 50 ? 1 : 2;
-    static const char* itemsPerPageComboItems[] = { "25", "50", "100" };
+    int currentIndex = doneItemsPerPage == 10 ? 0 : doneItemsPerPage == 25 ? 1 : 2;
     ImGui::SetNextItemWidth(100.0f);
     if (ImGui::Combo("Items per page", &currentIndex, itemsPerPageComboItems, IM_ARRAYSIZE(itemsPerPageComboItems))) {
         switch (currentIndex) {
-        case 0: itemsPerPage = 25; break;
-        case 1: itemsPerPage = 50; break;
-        case 2: itemsPerPage = 100; break;
-        default: itemsPerPage = 25;
+        case 0: doneItemsPerPage = 10; break;
+        case 1: doneItemsPerPage = 25; break;
+        case 2: doneItemsPerPage = 50; break;
+        default: doneItemsPerPage = 10;
         }
     }
     ImGui::SameLine();
 
     // Text "Page X of Y"
-    int totalPagesAvailable = (totalAvailableTasks + itemsPerPage - 1) / itemsPerPage;
-    std::string pagesText = "Page " + std::to_string(currentPage) + " of " + std::to_string(totalPagesAvailable);
+    int totalPagesAvailable = (totalAvailableTasks + doneItemsPerPage - 1) / doneItemsPerPage;
+    std::string pagesText = "Page " + std::to_string(doneCurrentPage) + " of " + std::to_string(totalPagesAvailable);
 
     float textWidth = ImGui::CalcTextSize(pagesText.c_str()).x;
     float windowWidth = ImGui::GetWindowWidth();
@@ -1100,14 +1285,14 @@ void renderDoneTasks() {
     ImGui::SameLine();
     ImGui::SetCursorPosX((windowWidth - textWidth) / 2 - 25 - 15);
     if (ImGui::Button("<", {25,25})) {
-        currentPage--;
-        if (currentPage == 0) currentPage = 1;
+        doneCurrentPage--;
+        if (doneCurrentPage == 0) doneCurrentPage = 1;
     }
     ImGui::SameLine();
     ImGui::SetCursorPosX((windowWidth - textWidth) / 2 + (textWidth) + 15);
     if (ImGui::Button(">", {25,25})) {
-        currentPage++;
-        if (currentPage > totalPagesAvailable) currentPage = totalPagesAvailable;
+        doneCurrentPage++;
+        if (doneCurrentPage > totalPagesAvailable) doneCurrentPage = totalPagesAvailable;
     }
 
     /*
@@ -1122,30 +1307,26 @@ void renderDoneTasks() {
     */
 }
 void renderTaskConfiguration() {
-    // TODO inputs for new category configuration
-
     char bufferTaskFilter[256];
     strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
     if (ImGui::InputText("Filter Table", bufferTaskFilter, sizeof(bufferTaskFilter))) {
         tableFilter = bufferTaskFilter;
     }
 
-    if (ImGui::BeginTable("ConfigurableItemsTable", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
-        ImGui::TableSetupColumn("Title", 0, 0.3f);
-        ImGui::TableSetupColumn("Description", 0, 0.0f);
-        if (editItem == nullptr) {
-            ImGui::TableSetupColumn("Type", 0, 0.15f);
-            ImGui::TableSetupColumn("Repeat Mode", 0, 0.15f);
-            ImGui::TableSetupColumn("Interval", 0, 0.15f);
-        }
-        else {
-            ImGui::TableSetupColumn("Type", 0, 0.3f);
-            ImGui::TableSetupColumn("Repeat Mode", 0, 0.3f);
-            ImGui::TableSetupColumn("Interval", 0, 0.3f);
-        }
-        ImGui::TableSetupColumn("##StartTask", 0, 0.15f);
-        ImGui::TableSetupColumn("##EditTask", 0, 0.15f);
-        ImGui::TableSetupColumn("##Delete", 0, 0.15f);
+    int totalAvailableTasks = 0;
+    int startAtTaskCount = (configCurrentPage - 1) * configItemsPerPage;
+    int endAtTaskCount = configCurrentPage * configItemsPerPage;
+
+    if (ImGui::BeginTable("ConfigurableItemsTable", 8, ImGuiTableFlags_Borders)) {
+
+        ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+        ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("Repeat Mode", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("Interval", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("##StartTask", ImGuiTableColumnFlags_WidthFixed, 25.0f);
+        ImGui::TableSetupColumn("##EditTask", ImGuiTableColumnFlags_WidthFixed, 25.0f);
+        ImGui::TableSetupColumn("##Delete", ImGuiTableColumnFlags_WidthFixed, 25.0f);
 
         ImGui::TableHeadersRow();
 
@@ -1160,6 +1341,10 @@ void renderTaskConfiguration() {
                 if (strContains(std::string(RepeatModeValue(item->repeatMode)),tableFilter)) found = true;
                 if (!found) continue;
             }
+#
+            totalAvailableTasks++;
+            if (totalAvailableTasks <= startAtTaskCount) continue; // still data of previous page
+            if (totalAvailableTasks > endAtTaskCount) continue; // data of next page
 
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -1169,9 +1354,11 @@ void renderTaskConfiguration() {
             else {
                 char bufferTitle[256];
                 strncpy_s(bufferTitle, editItem->title.c_str(), sizeof(bufferTitle));
+                ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::InputText("##Title", bufferTitle, sizeof(bufferTitle))) {
                     editItem->title = bufferTitle;
                 }
+                ImGui::PopItemWidth();
             }
             ImGui::TableNextColumn(); 
             if (editItem == nullptr || editItem->id != item->id) {
@@ -1180,9 +1367,11 @@ void renderTaskConfiguration() {
             else {
                 char bufferDesc[256];
                 strncpy_s(bufferDesc, editItem->description.c_str(), sizeof(bufferDesc));
+                ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::InputTextMultiline("##Desc", bufferDesc, sizeof(bufferDesc))) {
                     editItem->description = bufferDesc;
                 }
+                ImGui::PopItemWidth();
             }
             ImGui::TableNextColumn(); 
             if (editItem == nullptr || editItem->id != item->id) {
@@ -1190,9 +1379,11 @@ void renderTaskConfiguration() {
             }
             else {
                 int typeValue = static_cast<int>(editItem->type);
+                ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::Combo("##Type", &typeValue, ItemTypeCombo, IM_ARRAYSIZE(ItemTypeCombo))) {
                     editItem->type = convertToType(typeValue);
                 }
+                ImGui::PopItemWidth();
             }
             ImGui::TableNextColumn(); 
             if (editItem == nullptr || editItem->id != item->id) {
@@ -1200,60 +1391,194 @@ void renderTaskConfiguration() {
             }
             else {
                 int repeatValue = static_cast<int>(editItem->repeatMode);
+                ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::Combo("##RepeatMode", &repeatValue, RepeatModeCombo, IM_ARRAYSIZE(RepeatModeCombo))) {
                     editItem->repeatMode = static_cast<RepeatMode>(repeatValue);
                 }
+                ImGui::PopItemWidth();
             }
             ImGui::TableNextColumn(); 
             if (editItem == nullptr || editItem->id != item->id) {
                 ImGui::Text(std::to_string(item->customRepeatInterval).c_str());
             }
             else {
+                ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::InputInt("##Interval", &editItem->customRepeatInterval)) {
                     if (editItem->customRepeatInterval < 0) editItem->customRepeatInterval = 0;
                 }
+                ImGui::PopItemWidth();
             }
             ImGui::TableNextColumn(); 
             if (editItem == nullptr || editItem->id != item->id) {
-                if (ImGui::Button(("Start##" + std::to_string(item->id)).c_str())) {
-                    renderAddNew = true;
-                    newItem = OrganizerItem(*item);
+                if (item->repeatMode == RepeatMode::ONCE) {
+                    // Single time task, begin "start task" routine
+                    if (iconStart != nullptr) {
+                        ImGui::PushID(hashString("start_" + std::to_string(item->id)));
+                        if (ImGui::ImageButton((ImTextureID)iconStart->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
 
-                    newInstance = {};
-                    newInstance.startDate = format_date(std::chrono::system_clock::now());
-                    newInstance.endDate = "";
-                    newInstance.completed = false;
-                    newInstance.itemId = item->id;
-                    selected_tab = 0;
+                            renderAddNew = true;
+                            newItem = OrganizerItem(*item);
+
+                            newInstance = {};
+                            newInstance.startDate = format_date(std::chrono::system_clock::now());
+                            newInstance.endDate = "";
+                            newInstance.completed = false;
+                            newInstance.itemId = item->id;
+                            selected_tab = 0;
+
+                        }
+                        ImGui::PopID();
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::BeginTooltip();
+                            ImGui::Text("Start Task");
+                            ImGui::EndTooltip();
+                        }
+                    }
+                    else {
+                        if (ImGui::Button(("Start##" + std::to_string(item->id)).c_str())) {
+                            renderAddNew = true;
+                            newItem = OrganizerItem(*item);
+
+                            newInstance = {};
+                            newInstance.startDate = format_date(std::chrono::system_clock::now());
+                            newInstance.endDate = "";
+                            newInstance.completed = false;
+                            newInstance.itemId = item->id;
+                            selected_tab = 0;
+                        }
+                    }
+                }
+                else if(!accountName.empty() && item->repeatMode != RepeatMode::ONCE) {
+                    // repeatable task, make the button subscribe / unsubscribe depending on subscription status!
+                    if (!item->accountConfiguration.contains(accountName)) {
+                        item->accountConfiguration.emplace(accountName, false);
+                    }
+                    Texture* btnTex = nullptr; // TODO
+                    bool subscribe;
+                    if(item->accountConfiguration[accountName]) {
+                        // is subscribed, btnTex should be "unsubscribe"
+                        btnTex = iconCancel;
+                        subscribe = false;
+                    }
+                    else {
+                        // is unsubscribed, btnTex should be "subscribe"
+                        btnTex = iconStart;
+                        subscribe = true;
+                    }
+
+                    if (btnTex != nullptr) {
+                        ImGui::PushID(hashString("subscribe_" + std::to_string(item->id)));
+                        if (ImGui::ImageButton((ImTextureID)btnTex->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                            item->accountConfiguration[accountName] = subscribe;
+                            organizerRepo->save();
+                            APIDefs->RaiseEventNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
+                        }
+                        ImGui::PopID();
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::BeginTooltip();
+                            ImGui::Text(subscribe ? "Subscribe" : "Unsubscribe");
+                            ImGui::EndTooltip();
+                        }
+                    }
+                    else {
+                        if (ImGui::Button(((subscribe ? "Subscribe" : "Unsubscribe") + std::string("##") + std::to_string(item->id)).c_str())) {
+                            item->accountConfiguration[accountName] = subscribe;
+                            organizerRepo->save();
+                            APIDefs->RaiseEventNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
+                        }
+                    }
                 }
             }
             else {
-                if (ImGui::Button(("Save##" + std::to_string(item->id)).c_str())) {
-                    item->title = editItem->title;
-                    item->description = editItem->description;
-                    item->type = editItem->type;
-                    item->repeatMode = editItem->repeatMode;
-                    item->customRepeatInterval = editItem->customRepeatInterval;
-                    editItem = nullptr;
-                    organizerRepo->save();
+                if (iconSave != nullptr) {
+                    ImGui::PushID(hashString("save_" + std::to_string(item->id)));
+                    if (ImGui::ImageButton((ImTextureID)iconSave->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                        item->title = editItem->title;
+                        item->description = editItem->description;
+                        item->type = editItem->type;
+                        item->repeatMode = editItem->repeatMode;
+                        item->customRepeatInterval = editItem->customRepeatInterval;
+                        editItem = nullptr;
+                        organizerRepo->save();
+                    }
+                    ImGui::PopID();
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("Save");
+                        ImGui::EndTooltip();
+                    }
+                }
+                else {
+                    if (ImGui::Button(("Save##" + std::to_string(item->id)).c_str())) {
+                        item->title = editItem->title;
+                        item->description = editItem->description;
+                        item->type = editItem->type;
+                        item->repeatMode = editItem->repeatMode;
+                        item->customRepeatInterval = editItem->customRepeatInterval;
+                        editItem = nullptr;
+                        organizerRepo->save();
+                    }
                 }
             }
             ImGui::TableNextColumn();
             if (editItem == nullptr || editItem->id != item->id) {
-                if (ImGui::Button(("Edit##" + std::to_string(item->id)).c_str())) {
-                    editItem = new OrganizerItem(*item);
+                if (iconEdit != nullptr) {
+                    ImGui::PushID(hashString("edit_" + std::to_string(item->id)));
+                    if (ImGui::ImageButton((ImTextureID)iconEdit->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                        editItem = new OrganizerItem(*item);
+                    }
+                    ImGui::PopID();
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("Edit configuration");
+                        ImGui::EndTooltip();
+                    }
+                }
+                else {
+                    if (ImGui::Button(("Edit##" + std::to_string(item->id)).c_str())) {
+                        editItem = new OrganizerItem(*item);
+                    }
                 }
             }
             else {
-                if (ImGui::Button(("Cancel##" + std::to_string(item->id)).c_str())) {
-                    editItem = nullptr;
+                if (iconCancel != nullptr) {
+                    ImGui::PushID(hashString("cancel_" + std::to_string(item->id)));
+                    if (ImGui::ImageButton((ImTextureID)iconCancel->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                        editItem = nullptr;
+                    }
+                    ImGui::PopID();
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("Cancel");
+                        ImGui::EndTooltip();
+                    }
+                }
+                else {
+                    if (ImGui::Button(("Cancel##" + std::to_string(item->id)).c_str())) {
+                        editItem = nullptr;
+                    }
                 }
             }
             ImGui::TableNextColumn(); 
             if (editItem == nullptr || editItem->id != item->id) {
-                if (ImGui::Button(("Remove##" + std::to_string(item->id)).c_str())) {
-                    item->deleted = true;
-                    organizerRepo->save();
+                if (iconTrash != nullptr) {
+                    ImGui::PushID(hashString("remove_" + std::to_string(item->id)));
+                    if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                        item->deleted = true;
+                        organizerRepo->save();
+                    }
+                    ImGui::PopID();
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("Delete configuration");
+                        ImGui::EndTooltip();
+                    }
+                }
+                else {
+                    if (ImGui::Button(("Remove##" + std::to_string(item->id)).c_str())) {
+                        item->deleted = true;
+                        organizerRepo->save();
+                    }
                 }
             }
             else {
@@ -1263,19 +1588,62 @@ void renderTaskConfiguration() {
         ImGui::EndTable();
     }
 
+    int currentIndex = configItemsPerPage == 10 ? 0 : configItemsPerPage == 25 ? 1 : 2;
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::Combo("Items per page", &currentIndex, itemsPerPageComboItems, IM_ARRAYSIZE(itemsPerPageComboItems))) {
+        switch (currentIndex) {
+        case 0: configItemsPerPage = 10; break;
+        case 1: configItemsPerPage = 25; break;
+        case 2: configItemsPerPage = 50; break;
+        default: configItemsPerPage = 10;
+        }
+    }
+    ImGui::SameLine();
+
+    // Text "Page X of Y"
+    int totalPagesAvailable = (totalAvailableTasks + configItemsPerPage - 1) / configItemsPerPage;
+    std::string pagesText = "Page " + std::to_string(configCurrentPage) + " of " + std::to_string(totalPagesAvailable);
+
+    float textWidth = ImGui::CalcTextSize(pagesText.c_str()).x;
+    float windowWidth = ImGui::GetWindowWidth();
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2);
+    ImGui::Text(pagesText.c_str());
+    // page buttons
+    ImGui::SameLine();
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 - 25 - 15);
+    if (ImGui::Button("<", { 25,25 })) {
+        configCurrentPage--;
+        if (configCurrentPage == 0) configCurrentPage = 1;
+    }
+    ImGui::SameLine();
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 + (textWidth)+15);
+    if (ImGui::Button(">", { 25,25 })) {
+        configCurrentPage++;
+        if (configCurrentPage > totalPagesAvailable) configCurrentPage = totalPagesAvailable;
+    }
+
+    ImGui::Separator();
+
     ImGui::Text("Tasks configured by Guild Wars 2 API");
     ImGui::Text("(Only tracked ones will show up here. Configure tracked tasks in the 'Ingame Activities' tab.");
 
-    if (ImGui::BeginTable("APIItemsTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
-        ImGui::TableSetupColumn("Title", 0, 0.3f);
-        ImGui::TableSetupColumn("Description", 0, 0.0f);
-        ImGui::TableSetupColumn("Type", 0, 0.4f);
-        ImGui::TableSetupColumn("Repeat Mode", 0, 0.25f);
-        
+    if (ImGui::BeginTable("APIItemsTable", 4, ImGuiTableFlags_Borders)) {
+        ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthFixed, 250.0f);
+        ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        ImGui::TableSetupColumn("Repeat Mode", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+
         ImGui::TableHeadersRow();
-        
+
         for (auto configurable : organizerRepo->getApiTaskConfigurables()) {
-            if (!configurable->active) continue; // we are only interested in what we configured
+            // Check if task is configured for this account
+            bool configured = false;
+            if (!accountName.empty() && configurable->accountConfiguration.count(accountName)) {
+                configured = configurable->accountConfiguration[accountName];
+            }
+            if (!configured) continue;
+
+            // Check if task meets filter criteria
             if (!tableFilter.empty()) {
                 bool found = false;
                 if (strContains(configurable->item.title, tableFilter)) found = true;
@@ -1285,6 +1653,7 @@ void renderTaskConfiguration() {
                 if (!found) continue;
             }
 
+            // All checks passed, print data
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::TextWrapped(configurable->item.title.c_str());
@@ -1298,7 +1667,83 @@ void renderTaskConfiguration() {
             ImGui::TableNextColumn();
             ImGui::Text(RepeatModeValue(configurable->item.repeatMode));
         }
-        
+
         ImGui::EndTable();
     }
+
+}
+void renderSettings() {
+    ImGui::Separator();
+    static char newKeyBuffer[128] = "";
+    static char newDescriptionBuffer[256] = "";
+
+    ImGui::InputText("New API Key", newKeyBuffer, IM_ARRAYSIZE(newKeyBuffer));
+    ImGui::InputText("Identifier", newDescriptionBuffer, IM_ARRAYSIZE(newDescriptionBuffer));
+    ImGui::SameLine();
+    if (ImGui::Button("Add Key")) {
+        std::string newKey(newKeyBuffer);
+        std::string newDescription(newDescriptionBuffer);
+        if (!newKey.empty() && !newDescription.empty()) {
+            addon::ApiKey apiKey = { newKey, newDescription };
+            settings.apiKeys.push_back(apiKey);
+
+            newKeyBuffer[0] = '\0';  // Clear the input buffer
+            newDescriptionBuffer[0] = '\0';  // Clear the input buffer
+
+            StoreSettings();
+        }
+    }
+
+    // Display existing keys with descriptions and remove button in a table
+    ImGui::Separator();
+    if (ImGui::BeginTable("APIKeysTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Identifier", ImGuiTableColumnFlags_WidthFixed, 250.0f);
+        ImGui::TableSetupColumn("API Key", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("##Permissions", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+        ImGui::TableHeadersRow();
+
+        for (auto it = settings.apiKeys.begin(); it != settings.apiKeys.end(); ) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text(it->identifier.c_str());
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped(maskApiKey(it->apiKey).c_str());
+            ImGui::TableSetColumnIndex(2);
+            gw2::token::ApiToken* token = apiTokenService.getToken(it->identifier);
+            if (token != nullptr) {
+                if (ImGui::CollapsingHeader("Permissions...")) {
+                    std::stringstream stream;
+                    for (auto perm : token->permissions) {
+                        stream << perm << std::endl;
+                    }
+                    ImGui::TextWrapped("%s", stream.str().c_str());
+                }
+            }
+            else {
+                ImGui::TextWrapped("%s", "No token info available at this time.");
+            }
+            
+            ImGui::TableSetColumnIndex(3);
+            if (ImGui::Button(("Remove##" + it->identifier).c_str())) {
+                it = settings.apiKeys.erase(it);  // Remove the key and get the next iterator
+                StoreSettings();
+            }
+            else {
+                ++it;  // Move to the next iterator
+            }
+        }
+
+        ImGui::EndTable();
+    }
+    ImGui::Separator();
+    /* need to resolve cycle dependencies to make autoStartService work here I'm afraid?
+    if (ImGui::Button("Trigger Daily Reset")) {
+        autoStartService.PerformDailyReset();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Trigger Weekly Reset")) {
+        autoStartService.PerformWeeklyReset();
+    }
+    */
 }

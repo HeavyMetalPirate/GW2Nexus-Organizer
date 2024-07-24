@@ -41,7 +41,7 @@ void ApiTokenService::startService() {
 		}
 	});
 
-	worker.detach();
+	//worker.detach();
 }
 
 void ApiTokenService::stopService() {

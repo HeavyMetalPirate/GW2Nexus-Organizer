@@ -66,20 +66,49 @@ void OrganizerRepository::initialize() {
 			}
 		}
 		// InitializerThreads
-		std::thread initDailyCrafting(InitializeDailyCrafting, this);
-		initDailyCrafting.detach();
-		std::thread initWorldBosses(InitializeWorldbosses, this);
-		initWorldBosses.detach();
-		std::thread initMapchests(InitializeMapchests, this);
-		initMapchests.detach();
-		std::thread initRaids(InitializeRaids, this);
-		initRaids.detach();
-		std::thread initDungeons(InitializeDungeons, this);
-		initDungeons.detach();
-		std::thread initAchievements(InitializeAchievements, this);
-		initAchievements.detach();
-		std::thread loadAccountProg(LoadAccountProgress, this);
-		loadAccountProg.detach();
+		std::thread* initDailyCrafting = new std::thread(InitializeDailyCrafting, this);
+		threadPool.push_back(initDailyCrafting);
+		
+		std::thread* initWorldBosses = new std::thread(InitializeWorldbosses, this);
+		threadPool.push_back(initWorldBosses);
+		
+		std::thread* initMapchests = new std::thread(InitializeMapchests, this);
+		threadPool.push_back(initMapchests);
+		
+		std::thread* initRaids = new std::thread(InitializeRaids, this);
+		threadPool.push_back(initRaids);
+
+		std::thread* initDungeons = new std::thread(InitializeDungeons, this);
+		threadPool.push_back(initDungeons);
+		
+		std::thread* initAchievements = new std::thread(InitializeAchievements, this);
+		threadPool.push_back(initAchievements);
+		
+		std::thread* loadAccountProg = new std::thread(LoadAccountProgress, this);
+		threadPool.push_back(loadAccountProg);
+
+		// Create Task instances for stuff like wizards vault that is more complex than i.e. world bosses
+		ApiTaskConfigurable* dailyWV = new ApiTaskConfigurable();
+		dailyWV->originalId = "wizardsvault_daily";
+		OrganizerItem dailyWVitem = OrganizerItem();
+		dailyWVitem.apiId = "wizardsvault_daily";
+		dailyWVitem.title = "Daiy Wizards Vault";
+		dailyWVitem.description = "Complete the daily Wizards Vault meta achievement.";
+		dailyWVitem.type = ItemType::DAILY_WIZARD_VAULT;
+		dailyWVitem.repeatMode = RepeatMode::DAILY;
+		dailyWV->item = dailyWVitem;
+		addApiTaskConfigurable(dailyWV);
+
+		ApiTaskConfigurable* weeklyWV = new ApiTaskConfigurable();
+		weeklyWV->originalId = "wizardsvault_weekly";
+		OrganizerItem weeklyWVitem = OrganizerItem();
+		weeklyWVitem.apiId = "wizardsvault_weekly";
+		weeklyWVitem.title = "Weekly Wizards Vault";
+		weeklyWVitem.description = "Complete the weekly Wizards Vault meta achievement.";
+		weeklyWVitem.type = ItemType::WEEKLY_WIZARDS_VAULT;
+		weeklyWVitem.repeatMode = RepeatMode::WEEKLY;
+		weeklyWV->item = weeklyWVitem;
+		addApiTaskConfigurable(weeklyWV);
 
 	}
 	catch (const std::exception& e) {
@@ -87,6 +116,12 @@ void OrganizerRepository::initialize() {
 	}
 	catch (...) {
 		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Unknown exception while calling OrganizerRepository::initialize()!");
+	}
+}
+
+void OrganizerRepository::unload() {
+	for (auto thread : threadPool) {
+		if (thread->joinable()) thread->join();
 	}
 }
 
@@ -165,6 +200,12 @@ ApiTaskConfigurable* OrganizerRepository::getApiTaskConfigurableByOriginalId(std
 void OrganizerRepository::addConfigurableItem(OrganizerItem* item) {
 	if (item->title.empty()) return; // empty title is not allowed
 	if (item->id > 0) return; // already known item, skip adding
+	for (auto i : configurableItems) {
+		if (i->title == item->title) { // known item by title
+			item->id = i->id;
+			return;
+		}
+	}
 	item->id = getNextConfiguratbleItemId();
 	configurableItems.push_back(item);
 	save();
@@ -257,7 +298,6 @@ void InitializeDailyCrafting(OrganizerRepository* repo) {
 		for (auto recipe : repo->dailycraft.recipes) {
 			ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 			configurable->originalId = recipe;
-			configurable->active = false;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = recipe;
 			item.title = dailyCraftablesTranslator.at(recipe);
@@ -290,7 +330,6 @@ void InitializeWorldbosses(OrganizerRepository* repo) {
 		for (auto worldboss : repo->worldbosses.worldbosses) {
 			ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 			configurable->originalId = worldboss;
-			configurable->active = false;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = worldboss;
 			item.title = worldbossesTranslator.at(worldboss);
@@ -323,7 +362,6 @@ void InitializeMapchests(OrganizerRepository* repo) {
 		for (auto meta : repo->mapchests.chests) {
 			ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 			configurable->originalId = meta;
-			configurable->active = false;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = meta;
 			item.title = mapChestsTranslator.at(meta);
@@ -356,7 +394,6 @@ void InitializeDungeons(OrganizerRepository* repo) {
 		for (auto dungeon : repo->dungeons) {
 			ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 			configurable->originalId = dungeon.id;
-			configurable->active = false;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = dungeon.id;
 			item.title = dungeonTranslator.at(dungeon.id);
@@ -369,7 +406,6 @@ void InitializeDungeons(OrganizerRepository* repo) {
 			for (auto path : dungeon.paths) {
 				ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 				configurable->originalId = path.id;
-				configurable->active = false;
 				OrganizerItem item = OrganizerItem();
 				item.apiId = path.id;
 				item.title = dungeonPathsTranslator.at(path.id);
@@ -404,7 +440,6 @@ void InitializeRaids(OrganizerRepository* repo) {
 			for (auto wing : raid.wings) {
 				ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 				configurable->originalId = wing.id;
-				configurable->active = false;
 				OrganizerItem item = OrganizerItem();
 				item.apiId = wing.id;
 				item.title = raidTranslator.at(wing.id);
@@ -417,7 +452,6 @@ void InitializeRaids(OrganizerRepository* repo) {
 				for (auto encounter : wing.events) {
 					ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 					configurable->originalId = encounter.id;
-					configurable->active = false;
 					OrganizerItem item = OrganizerItem();
 					item.apiId = encounter.id;
 					item.title = raidBossesTranslator.at(encounter.id);
@@ -479,7 +513,6 @@ void InitializeAchievements(OrganizerRepository* repo) {
 		for (auto achievementEntry : repo->achievements) {
 			ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 			configurable->originalId = "achievement_group_" + std::to_string(achievementEntry.first.id);
-			configurable->active = false;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = std::to_string(achievementEntry.first.id);
 			item.title = achievementEntry.first.name;
@@ -499,7 +532,6 @@ void InitializeAchievements(OrganizerRepository* repo) {
 			for (auto achievement : achievementEntry.second) {
 				ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 				configurable->originalId = "achievement_single_" + std::to_string(achievement.id);
-				configurable->active = false;
 				OrganizerItem item = OrganizerItem();
 				item.apiId = std::to_string(achievement.id);
 				item.title = achievement.name;
@@ -534,30 +566,43 @@ void LoadAccountProgress(OrganizerRepository* repo) {
 				gw2::account::Account account = LoadAccountData(key.apiKey);
 				if (account.name.empty()) continue;
 				repo->accounts.emplace(account.name, account);
+				if (unloading) break;
 
 				// Fetch progression for Daily Crafting
 				for (auto recipe : LoadDailyCrafting(key.apiKey)) {
 					repo->addAccountProgression(recipe, account.name);
 				}
+				if (unloading) break;
+
 				// Fetch progression for Daily Dungeons
 				for (auto dungeon : LoadDailyDungeons(key.apiKey)) {
 					repo->addAccountProgression(dungeon, account.name);
 				}
+				if (unloading) break;
+
 				// Fetch progression for Daily Map Chests
 				for (auto chest : LoadDailyMetas(key.apiKey)) {
 					repo->addAccountProgression(chest, account.name);
 				}
+				if (unloading) break;
+
 				// Fetch progression for Daily World Bosses
 				for (auto worldboss : LoadWorldBosses(key.apiKey)) {
 					repo->addAccountProgression(worldboss, account.name);
 				}
+				if (unloading) break;
+
 				// Fetch progression for Daily Wizards Vault Daily
-				repo->wizardsVaultDaily[account.name] = LoadDailyWizardsVault(key.apiKey);			
+				repo->wizardsVaultDaily[account.name] = LoadDailyWizardsVault(key.apiKey);
+				if (unloading) break;
 				// Fetch progression for Daily Wizards Vault Weekly
 				repo->wizardsVaultWeekly[account.name] = LoadWeeklyWizardsVault(key.apiKey);
+				if (unloading) break;
+
 				// Fetch progression for Daily Raids
 				for (auto raid : LoadRaids(key.apiKey)) {
 					repo->addAccountProgression(raid, account.name);
+					if (unloading) break;
 				}
 
 				// TODO check off in organizer repo if open task instance for the type is available for that account owner

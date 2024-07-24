@@ -219,10 +219,16 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\BtnAdd.png" />
+    <Image Include="resources\BtnCancel.png" />
     <Image Include="resources\BtnCheck.png" />
     <Image Include="resources\BtnClock.png" />
     <Image Include="resources\BtnClose.png" />
+    <Image Include="resources\BtnEdit.png" />
+    <Image Include="resources\BtnNoRepetition.png" />
     <Image Include="resources\BtnOptions.png" />
+    <Image Include="resources\BtnReactivate.png" />
+    <Image Include="resources\BtnSave.png" />
+    <Image Include="resources\BtnStart.png" />
     <Image Include="resources\BtnTrash.png" />
     <Image Include="resources\icon_shortcut.png" />
     <Image Include="resources\icon_shortcut_hover.png" />

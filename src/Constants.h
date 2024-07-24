@@ -6,6 +6,9 @@
 static const char* ADDON_NAME = "Organizer";
 static const std::string baseUrl = "https://api.guildwars2.com";
 
+static const char* EV_NAME_DAILY_RESET = "EV_ORANIZER_DAILY_RESET_REQUEST";
+static const char* EV_NAME_WEEKLY_RESET = "EV_ORANIZER_WEEKLY_RESET_REQUEST";
+
 static const std::map<int, int> calender = {
 	{1, 31},
 	{2, 0}, // leap year calculation 
@@ -31,7 +34,7 @@ static const char* daysOfWeek[] = {
 // String mappers
 static const std::map<std::string, std::string> dailyCraftablesTranslator = {
 	{"charged_quartz_crystal", "Charged Quartz Crystal"},
-	{"glob_of_elder_spirit_residue", "Glob of Elder Spirit Redidue"},
+	{"glob_of_elder_spirit_residue", "Glob of Elder Spirit Residue"},
 	{"lump_of_mithrilium","Lump of Mithrilium"},
 	{"spool_of_silk_weaving_thread","Spool of Silk Weaving Thread"},
 	{"spool_of_thick_elonian_cord","Spool of Thick Elonian Cord"}

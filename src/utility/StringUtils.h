@@ -43,4 +43,24 @@ inline unsigned int hashString(const std::string& str)
     return hash;
 }
 
+inline std::string maskApiKey(const std::string& apiKey) {
+    std::stringstream ss(apiKey);
+    std::string segment;
+    std::vector<std::string> segments;
+
+    // Split the apiKey by '-'
+    while (std::getline(ss, segment, '-')) {
+        segments.push_back(segment);
+    }
+
+    // Ensure there are at least two segments
+    if (segments.size() < 2) {
+        return apiKey; // or handle error
+    }
+
+    // Construct the masked string
+    std::string maskedKey = segments.front() + "-...-" + segments.back();
+    return maskedKey;
+}
+
 #endif

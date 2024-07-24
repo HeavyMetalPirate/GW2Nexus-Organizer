@@ -95,9 +95,11 @@ struct OrganizerItem {
 	RepeatMode repeatMode;
 	int customRepeatInterval;
 
+	std::map<std::string, bool> accountConfiguration;
+
 	bool deleted;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItem, id, apiId, title, description, type, repeatMode, customRepeatInterval, deleted);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItem, id, apiId, title, description, type, repeatMode, customRepeatInterval, accountConfiguration, deleted);
 
 struct OrganizerItemInstance {
 	int id;
@@ -121,8 +123,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItemInstance, id, owner
 struct ApiTaskConfigurable {
 	OrganizerItem item;
 	std::string originalId;
-	bool active;
+	std::map<std::string, bool> accountConfiguration;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ApiTaskConfigurable, item, originalId, active);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ApiTaskConfigurable, item, originalId, accountConfiguration);
 
 #endif
