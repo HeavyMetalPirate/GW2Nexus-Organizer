@@ -63,29 +63,29 @@ int configCurrentPage = 1;
 
 void Renderer::preRender() {
     if (iconClose == nullptr)
-        iconClose = APIDefs->GetTexture("ICON_ORGANIZER_CLOSE");
+        iconClose = APIDefs->Textures.Get("ICON_ORGANIZER_CLOSE");
     if (iconOptions == nullptr)
-        iconOptions = APIDefs->GetTexture("ICON_ORGANIZER_OPTIONS");
+        iconOptions = APIDefs->Textures.Get("ICON_ORGANIZER_OPTIONS");
     if (iconCheck == nullptr)
-        iconCheck = APIDefs->GetTexture("ICON_ORGANIZER_CHECK");
+        iconCheck = APIDefs->Textures.Get("ICON_ORGANIZER_CHECK");
     if (iconTrash == nullptr)
-        iconTrash = APIDefs->GetTexture("ICON_ORGANIZER_TRASH");
+        iconTrash = APIDefs->Textures.Get("ICON_ORGANIZER_TRASH");
     if (iconAdd == nullptr)
-        iconAdd = APIDefs->GetTexture("ICON_ORGANIZER_ADD");
+        iconAdd = APIDefs->Textures.Get("ICON_ORGANIZER_ADD");
     if (iconRepeat == nullptr)
-        iconRepeat = APIDefs->GetTexture("ICON_ORGANIZER_REPEAT");
+        iconRepeat = APIDefs->Textures.Get("ICON_ORGANIZER_REPEAT");
     if (iconReactivate == nullptr)
-        iconReactivate = APIDefs->GetTexture("ICON_ORGANIZER_REACTIVATE");
+        iconReactivate = APIDefs->Textures.Get("ICON_ORGANIZER_REACTIVATE");
     if (iconStart == nullptr)
-        iconStart = APIDefs->GetTexture("ICON_ORGANIZER_START");
+        iconStart = APIDefs->Textures.Get("ICON_ORGANIZER_START");
     if (iconEdit == nullptr)
-        iconEdit = APIDefs->GetTexture("ICON_ORGANIZER_EDIT");
+        iconEdit = APIDefs->Textures.Get("ICON_ORGANIZER_EDIT");
     if (iconNoRepeat == nullptr)
-        iconNoRepeat = APIDefs->GetTexture("ICON_ORGANIZER_NO_REPEAT");
+        iconNoRepeat = APIDefs->Textures.Get("ICON_ORGANIZER_NO_REPEAT");
     if (iconSave == nullptr)
-        iconSave = APIDefs->GetTexture("ICON_ORGANIZER_SAVE");
+        iconSave = APIDefs->Textures.Get("ICON_ORGANIZER_SAVE");
     if (iconCancel == nullptr)
-        iconCancel = APIDefs->GetTexture("ICON_ORGANIZER_CANCEL");
+        iconCancel = APIDefs->Textures.Get("ICON_ORGANIZER_CANCEL");
 
     if (accountName.empty()) displayOwnOnly = false;
 }
@@ -739,7 +739,7 @@ void renderAPITasks() {
             }
             if (ImGui::Checkbox("Auto track daily meta achievement", &dailyWv->accountConfiguration[accountName])) {
                 organizerRepo->save();
-                APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+                APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
             }
         }
         ImGui::SetCursorPosX(30);
@@ -753,7 +753,7 @@ void renderAPITasks() {
             }
             if (ImGui::Checkbox("Auto track weekly meta achievement", &weeklyWv->accountConfiguration[accountName])) {
                 organizerRepo->save();
-                APIDefs->RaiseEventNotification(EV_NAME_WEEKLY_RESET);
+                APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
             }
         }
 
@@ -839,7 +839,7 @@ void renderAPITasks() {
                     if (configurable->accountConfiguration.count(accountName) == 0) {
                         configurable->accountConfiguration.emplace(accountName, false);
                     }
-                    if (ImGui::Checkbox(("Track all achievements for category " + category.first.name).c_str(), &configurable->accountConfiguration[accountName])) {
+                    if (ImGui::Checkbox(("Track category " + category.first.name).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
                     }
                 }
@@ -857,7 +857,19 @@ void renderAPITasks() {
                         ImGui::TableNextColumn();
                         ImGui::TextWrapped(achievement.requirement.c_str());
                         ImGui::TableNextColumn();
-
+                        ImGui::Text("");
+                        /*
+                        * This segment is deactivated for now - single API Achievement tracking leads to a lot of issues because of how
+                        * the achievement API works; it changes the achievement id each cycle for a lot of achievements. However, the "track" button
+                        * would just subscribe to *that one specific* achievement (i.e. "Daily T4 Thaumanova") instead of the placeholder value (i.e. "Daily T4 Fractal 1/2/3")
+                        * => this leads to the issue that the user would always get the same specific task (i.e. "Daily T4 Thaumanova") instead of the right one for the cycle
+                        * This happens with Fractals, Strikes, Daily LWS/IBS/EoD, Weekly Rifts, leaving only Weekly WvW and Weekly Fractals left and for those... well, they
+                        * have issues on their own already so leave it as is.
+                        * 
+                        * Future consideration might be a whitelist "achievement category that has static ids" or a "group by achievement category" kinda sanitazion and the 
+                        * Task AutoStartService might read the current rotation to display the correct task; this could potentially lead to confusions however when a user
+                        * does not complete the task and it sticks into the next cycle, remaining uncompletable at that point
+                        * 
                         ApiTaskConfigurable* configurable = organizerRepo->getApiTaskConfigurableByOriginalId("achievement_single_" + std::to_string(achievement.id));
                         if (configurable == nullptr || accountName.empty()) {
                             ImGui::Text("n/a");
@@ -870,6 +882,7 @@ void renderAPITasks() {
                                 organizerRepo->save();
                             }
                         }
+                        */
                     }
                     ImGui::EndTable();
                 }
@@ -915,7 +928,7 @@ void renderAPITasks() {
                     }
                     if (ImGui::Checkbox(("Auto track##track_" + craftable).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
-                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+                        APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
                     }
                 }
             }
@@ -963,7 +976,7 @@ void renderAPITasks() {
                     }
                     if (ImGui::Checkbox(("Auto track##track_" + meta).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
-                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+                        APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
                     }
                 }
             }
@@ -1010,7 +1023,7 @@ void renderAPITasks() {
                     }
                     if (ImGui::Checkbox(("Auto track##track_" + boss).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
-                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+                        APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
                     }
                 }
             }
@@ -1034,7 +1047,7 @@ void renderAPITasks() {
                     }
                     if (ImGui::Checkbox(("Track all paths of " + dungeonTranslator.at(dungeon.id)).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
-                        APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+                        APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
                     }
                 }
                 ImGui::SetCursorPosX(30);
@@ -1076,7 +1089,7 @@ void renderAPITasks() {
                             }
                             if (ImGui::Checkbox(("Auto track##track_" + path.id).c_str(), &configurable->accountConfiguration[accountName])) {
                                 organizerRepo->save();
-                                APIDefs->RaiseEventNotification(EV_NAME_DAILY_RESET);
+                                APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
                             }
                         }
                     }
@@ -1102,7 +1115,7 @@ void renderAPITasks() {
                         }
                         if (ImGui::Checkbox(("Track all bosses of " + raidTranslator.at(wing.id)).c_str(), &configurable->accountConfiguration[accountName])) {
                             organizerRepo->save();
-                            APIDefs->RaiseEventNotification(EV_NAME_WEEKLY_RESET);
+                            APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
                         }
                     }
                     ImGui::SetCursorPosX(30);
@@ -1142,7 +1155,7 @@ void renderAPITasks() {
                                 }
                                 if (ImGui::Checkbox(("Auto track##track_" + boss.id).c_str(), &configurable->accountConfiguration[accountName])) {
                                     organizerRepo->save(); 
-                                    APIDefs->RaiseEventNotification(EV_NAME_WEEKLY_RESET);
+                                    APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
                                 }
                             }
                         }
@@ -1471,7 +1484,7 @@ void renderTaskConfiguration() {
                         if (ImGui::ImageButton((ImTextureID)btnTex->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
                             item->accountConfiguration[accountName] = subscribe;
                             organizerRepo->save();
-                            APIDefs->RaiseEventNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
+                            APIDefs->Events.RaiseNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
                         }
                         ImGui::PopID();
                         if (ImGui::IsItemHovered()) {
@@ -1484,7 +1497,7 @@ void renderTaskConfiguration() {
                         if (ImGui::Button(((subscribe ? "Subscribe" : "Unsubscribe") + std::string("##") + std::to_string(item->id)).c_str())) {
                             item->accountConfiguration[accountName] = subscribe;
                             organizerRepo->save();
-                            APIDefs->RaiseEventNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
+                            APIDefs->Events.RaiseNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
                         }
                     }
                 }
@@ -1737,13 +1750,59 @@ void renderSettings() {
         ImGui::EndTable();
     }
     ImGui::Separator();
-    /* need to resolve cycle dependencies to make autoStartService work here I'm afraid?
+    if (ImGui::Checkbox("Enable Notifications", &settings.notifications.enabled)) {
+        StoreSettings();
+    }
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::InputInt("Notification X minutes before", &settings.notifications.minutesUntilDue)) {
+        StoreSettings();
+    }
+
+    ImGui::Text("Notifications position (X:Y)");
+
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::InputInt("##NotificationPosX", &settings.notifications.x)) {
+        StoreSettings();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::InputInt("##NotificationPosY", &settings.notifications.y)) {
+        StoreSettings();
+    }
+
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::InputInt("Width", &settings.notifications.width)) {
+        StoreSettings();
+    }
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::InputInt("Height", &settings.notifications.height)) {
+        StoreSettings();
+    }
+
+    ImGui::SetNextItemWidth(100.0f);
+    int durationSec = settings.notifications.duration / 1000;
+    if (ImGui::InputInt("Duration (sec.)", &durationSec)) {
+        settings.notifications.duration = durationSec * 1000;
+        StoreSettings();
+    }
+    // TODO growth direction, Border Color
+
+    if (ImGui::Button("Test Notifications")) {
+        toast::ToastData* data = new toast::ToastData();
+        data->toastId = "Sample_" + std::to_string(MumbleLink->UITick);
+        data->title = "Test Notification";
+        data->text = "This is a sample notification.";
+        notificationService.queueToast(data);
+    }
+
+    ImGui::Separator();
+    
     if (ImGui::Button("Trigger Daily Reset")) {
-        autoStartService.PerformDailyReset();
+        APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
     }
     ImGui::SameLine();
     if (ImGui::Button("Trigger Weekly Reset")) {
-        autoStartService.PerformWeeklyReset();
+        APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
     }
-    */
+    
 }

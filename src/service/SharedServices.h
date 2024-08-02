@@ -3,8 +3,10 @@
 
 #include "OrganizerRepository.h"
 #include "ApiTokenService.h"
+#include "NotificationService.h"
 
 extern OrganizerRepository* organizerRepo;
 extern ApiTokenService apiTokenService;
+extern NotificationService notificationService;
 
 #endif

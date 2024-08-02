@@ -30,6 +30,8 @@ private:
 	void CreateTasksForRepeatMode(RepeatMode mode);
 	void CreateTasksForAccount(RepeatMode mode, std::string account);
 
+	void CheckNotifications();
+
 	std::chrono::system_clock::time_point getLastDailyReset() const;
 	std::chrono::system_clock::time_point getLastWeeklyReset() const;
 	std::chrono::system_clock::time_point getNextDailyReset() const;

@@ -76,7 +76,7 @@ struct EvAgentUpdate				// when ev is null
 // Utility
 
 inline std::string getAddonFolder() {
-	std::string pathFolder = APIDefs->GetAddonDirectory(ADDON_NAME);
+	std::string pathFolder = APIDefs->Paths.GetAddonDirectory(ADDON_NAME);
 	// Create folder if not exist
 	if (!fs::exists(pathFolder)) {
 		try {

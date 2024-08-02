@@ -23,6 +23,7 @@
     <ClCompile Include="service\ApiTokenService.cpp" />
     <ClCompile Include="service\DataLoadingFunctions.cpp" />
     <ClCompile Include="service\AutoStartService.cpp" />
+    <ClCompile Include="service\NotificationService.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imstb_truetype.h">
@@ -61,6 +62,7 @@
     <ClInclude Include="service\DataLoadingFunctions.h" />
     <ClInclude Include="service\AutoStartService.h" />
     <ClInclude Include="service\SharedServices.h" />
+    <ClInclude Include="service\NotificationService.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">

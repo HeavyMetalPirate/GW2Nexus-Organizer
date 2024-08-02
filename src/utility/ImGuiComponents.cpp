@@ -75,7 +75,7 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
         day = std::stoi(matches[3].str());
         hour = std::stoi(matches[4].str());
         minute = std::stoi(matches[5].str());
-        second = std::stoi(matches[6].str());
+        second = 0;
         timezoneSign = matches[7].str()[0];
         timezoneOffsetHour = std::stoi(matches[8].str());
         timezoneOffsetMinute = std::stoi(matches[9].str());
@@ -95,7 +95,7 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
         day = now_tm.tm_mday;
         hour = now_tm.tm_hour;
         minute = now_tm.tm_min;
-        second = now_tm.tm_sec;
+        second = 0;
 
         // Calculate timezone offset
         std::time_t local_time = std::mktime(&now_tm);

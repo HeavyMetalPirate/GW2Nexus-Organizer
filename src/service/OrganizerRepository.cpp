@@ -8,6 +8,10 @@ void InitializeDungeons(OrganizerRepository* repo);
 void InitializeRaids(OrganizerRepository* repo);
 void InitializeAchievements(OrganizerRepository* repo);
 void LoadAccountProgress(OrganizerRepository* repo);
+void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountName);
+
+std::map<std::string, std::vector<std::string>> raidEncounters = {};
+std::map<std::string, std::vector<std::string>> dungeonPaths = {};
 
 bool OrganizerRepository::firstInitializeDone() {
 	if (!accountProgressInitialized) return false;
@@ -263,7 +267,6 @@ int OrganizerRepository::getNextApiTaskConfigurableId() {
 	return ++nextApiTaskConfigurableId;
 }
 
-
 void OrganizerRepository::addAccountProgression(std::string progressionId, std::string accountName) {
 	if (progressionPerAccount.count(progressionId) == 0) {
 		progressionPerAccount.emplace(progressionId, std::vector<std::string>());
@@ -402,6 +405,7 @@ void InitializeDungeons(OrganizerRepository* repo) {
 			item.repeatMode = RepeatMode::DAILY;
 			configurable->item = item;
 			repo->addApiTaskConfigurable(configurable);
+			dungeonPaths[dungeon.id] = {};
 
 			for (auto path : dungeon.paths) {
 				ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
@@ -414,6 +418,10 @@ void InitializeDungeons(OrganizerRepository* repo) {
 				item.repeatMode = RepeatMode::DAILY;
 				configurable->item = item;
 				repo->addApiTaskConfigurable(configurable);
+
+				if (path.type == "Explorable") { // ignore story paths because lol
+					dungeonPaths[dungeon.id].push_back(path.id);
+				}
 			}
 		}
 	}
@@ -449,6 +457,8 @@ void InitializeRaids(OrganizerRepository* repo) {
 				configurable->item = item;
 				repo->addApiTaskConfigurable(configurable);
 
+				raidEncounters[wing.id] = {};
+
 				for (auto encounter : wing.events) {
 					ApiTaskConfigurable* configurable = new ApiTaskConfigurable();
 					configurable->originalId = encounter.id;
@@ -460,6 +470,7 @@ void InitializeRaids(OrganizerRepository* repo) {
 					item.repeatMode = RepeatMode::WEEKLY;
 					configurable->item = item;
 					repo->addApiTaskConfigurable(configurable);
+					raidEncounters[wing.id].push_back(encounter.id);
 				}
 			}
 		}
@@ -606,7 +617,7 @@ void LoadAccountProgress(OrganizerRepository* repo) {
 				}
 
 				// TODO check off in organizer repo if open task instance for the type is available for that account owner
-
+				CheckAccountProgressTasks(repo, account.name);
 			}
 			catch (const std::exception& e) {
 				APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("OrganizerRepository::LoadAccountProgress(): " + std::string(e.what())).c_str());
@@ -624,5 +635,97 @@ void LoadAccountProgress(OrganizerRepository* repo) {
 			Sleep(1);
 			if (unloading) break;
 		}
+	}
+}
+
+void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountName) {
+	try {
+		for (auto task : repo->getTaskInstances()) {
+			if (task->completed || task->deleted) continue; // filter out already completed ones
+			if (!strContains(task->owner, accountName)) continue; // filter out tasks not belonging to account
+			OrganizerItem* item = repo->getConfigurableItemById(task->itemId);
+			if (item->deleted) continue; // filter out deleted categories
+			if (item->type == ItemType::DEFAULT) continue; // we can't handle default/custom types automatically
+			if (item->apiId.empty()) continue; // we need the api id to check against 
+			
+			if (item->type == ItemType::DAILY_WIZARD_VAULT) {
+				// check daily wizards vault data for account
+				if (repo->wizardsVaultDaily[accountName].meta_reward_claimed) {
+					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
+					task->completed = true;
+					task->completionDate = format_date(std::chrono::system_clock::now());
+				}
+			} 
+			else if (item->type == ItemType::WEEKLY_WIZARDS_VAULT) {
+				// check weekly wizards vault data for account
+				if (repo->wizardsVaultWeekly[accountName].meta_reward_claimed) {
+					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
+					task->completed = true;
+					task->completionDate = format_date(std::chrono::system_clock::now());
+				}
+			}
+			/*
+				TODO: Special checks:
+				Suppose we have a "all daily crafting" or "all world bosses" task, then we wanna fetch that from the account progression 
+				using known values for that category and check that task off if *all* of them are fullfilled for that account;
+				See example below for raid and dungeons
+
+				Another future consideration might be when we allow achievement selections as task configurations (i.e. user wants to track "Achievement X" as TODO by 
+				selecting it from a dropdown or input of the ID or whatever works and the API might actually return status of the achievement so we can automatically tick it off)
+			*/
+			else if (raidEncounters.contains(item->apiId)) {
+				bool raidCompleted = true; // we expect our players to be pro raiders!
+				for (auto encounter : raidEncounters[item->apiId]) {
+					auto accounts = repo->getAccountProgression(encounter);
+					auto result = std::ranges::find(accounts, accountName);
+					// check if account name is missing
+					if (result == accounts.end()) {
+						raidCompleted = false;
+						break; // oh oh, missing so not complete, can break here
+					}
+				}
+				if (raidCompleted) {
+					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
+					task->completed = true;
+					task->completionDate = format_date(std::chrono::system_clock::now());
+				}
+			}
+			else if (dungeonPaths.contains(item->apiId)) {
+				bool dungeonCompleted = true; // we expect our players to be pro raiders!
+				for (auto path : dungeonPaths[item->apiId]) {
+					auto accounts = repo->getAccountProgression(path);
+					auto result = std::ranges::find(accounts, accountName);
+					// check if account name is missing
+					if (result == accounts.end()) {
+						dungeonCompleted = false;
+						break; // oh oh, missing so not complete, can break here
+					}
+				}
+				if (dungeonCompleted) {
+					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
+					task->completed = true;
+					task->completionDate = format_date(std::chrono::system_clock::now());
+				}
+			}
+			else {
+				// check progress by account progression map
+				auto accounts = repo->getAccountProgression(item->apiId);
+				for (auto account : accounts) {
+					if (account == accountName) {
+						APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + account + "'.").c_str());
+						task->completed = true;
+						task->completionDate = format_date(std::chrono::system_clock::now());
+					}
+				}
+			}
+		}
+
+		repo->save();
+	}
+	catch (const std::exception& e) {
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("OrganizerRepository::CheckAccountProgressTasks(): " + std::string(e.what())).c_str());
+	}
+	catch (...) {
+		APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Could not check Account progression against task data. Certain functionality might not be fully available.");
 	}
 }

@@ -193,6 +193,7 @@
     <ClInclude Include="service\DataLoadingFunctions.h" />
     <ClInclude Include="service\HttpClient.h" />
     <ClInclude Include="service\AutoStartService.h" />
+    <ClInclude Include="service\NotificationService.h" />
     <ClInclude Include="service\OrganizerRepository.h" />
     <ClInclude Include="service\SharedServices.h" />
     <ClInclude Include="Settings.h" />
@@ -211,6 +212,7 @@
     <ClCompile Include="service\ApiTokenService.cpp" />
     <ClCompile Include="service\AutoStartService.cpp" />
     <ClCompile Include="service\DataLoadingFunctions.cpp" />
+    <ClCompile Include="service\NotificationService.cpp" />
     <ClCompile Include="service\OrganizerRepository.cpp" />
     <ClCompile Include="utility\ImGuiComponents.cpp" />
   </ItemGroup>

@@ -40,6 +40,7 @@ void AutoStartService::endWorker() {
 void AutoStartService::CheckResetTimes() {
     while (running) {
         if (!organizerRepo->firstInitializeDone()) continue;
+        
         if (CheckDailyReset()) {
             PerformDailyReset();
             std::this_thread::sleep_for(std::chrono::minutes(1)); // Avoid triggering multiple times within the same minute
@@ -52,6 +53,7 @@ void AutoStartService::CheckResetTimes() {
             PerformWvWReset();
             std::this_thread::sleep_for(std::chrono::minutes(1)); // Avoid triggering multiple times within the same minute
         }
+        CheckNotifications();
         for (int i = 0; i < 1000; i++) {
             Sleep(1);
             if (!running) return;
@@ -59,6 +61,53 @@ void AutoStartService::CheckResetTimes() {
     }
 }
 
+void AutoStartService::CheckNotifications() {
+    std::string owner = "";
+
+    if (accountName.empty() && characterName.empty()) {
+        owner = "Everyone";
+    }
+    else if (!accountName.empty()) {
+        owner = accountName;
+    }
+    else if (!characterName.empty()) {
+        owner = characterName;
+    }
+
+    for (auto instance : organizerRepo->getTaskInstances()) {
+        if (instance->completed || instance->deleted) continue; // filter complete/deleted instances
+        if (instance->endDate.empty()) continue; // filter instances with no due date
+        if (instance->notified) continue; // filter already notified tasks
+        if (!strContains(instance->owner, owner)) continue; // not owner of task
+
+        try {
+            auto dueDate = parse_date(instance->endDate);
+            auto zonedDue = std::chrono::zoned_time(std::chrono::current_zone(), dueDate);
+            int minutes = settings.notifications.minutesUntilDue > 0 ? settings.notifications.minutesUntilDue : 15;
+            auto now = std::chrono::system_clock::now() + std::chrono::minutes(minutes); // TODO 15 minutes => read from settings instead
+            auto zonedNow = std::chrono::zoned_time(std::chrono::current_zone(), now);
+
+            if (dueDate.time_since_epoch() < zonedNow.get_local_time().time_since_epoch()) {
+                // fire notification pewpew
+                toast::ToastData* data = new toast::ToastData();
+                data->toastId = "taskNotification_" + std::to_string(instance->id);
+
+                OrganizerItem* item = organizerRepo->getConfigurableItemById(instance->itemId);
+                data->title = item->title;
+                data->text = "Task due: " + replaceNewLines(format_date_output(instance->endDate));
+                data->chatLink = "";
+                data->texture = nullptr; // possible TODO if I have a cool icon
+
+                notificationService.queueToast(data);
+                instance->notified = true;
+                organizerRepo->save();
+            }
+        }
+        catch (...) {
+            continue;
+        }
+    }
+}
 
 // =================================================================================
 // Performers
@@ -116,7 +165,7 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             // At this point we know the instance is of the right type
             // for the right owner and isn't a deleted instance, so
             // check if we have an open instance of that type
-            if (!instance->completed) {
+            if (!instance->completed && !instance->deleted) {
                 APIDefs->Log(ELogLevel_WARNING, ADDON_NAME, ("Task '" + item->title + "' not completed on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break; // not finished yet on this account
@@ -125,6 +174,12 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             // If the instance is not open but completed or deleted, check if the begin date was "since last reset"
             std::chrono::time_point lastReset = mode == RepeatMode::DAILY ? getLastDailyReset() : getLastWeeklyReset();
             if ((instance->completed || instance->deleted) && parse_date(instance->startDate) >= lastReset) {
+                APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + item->title + "' already started and completed/deleted since relevant reset on account " + account + " - skipping creation.").c_str());
+                startTask = false;
+                break;
+            }
+
+            if ((instance->completed || instance->deleted) && (instance->endDate.length() > 5 && parse_date(instance->endDate) >= lastReset)) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + item->title + "' already completed since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;
@@ -157,15 +212,22 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             // At this point we know the instance is of the right type
             // for the right owner and isn't a deleted instance, so
             // check if we have an open instance of that type
-            if (!instance->completed) {
+            if (!instance->completed && !instance->deleted) {
                 APIDefs->Log(ELogLevel_WARNING, ADDON_NAME, ("Task '" + apiTask->item.title + "' not completed on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break; // not finished yet on this account
             }
 
-            // If the instance is not open but completed, check if the completion date was "since last reset"
+            // If the instance is not open but completed, check if the start date was "since last reset"
             std::chrono::time_point lastReset = mode == RepeatMode::DAILY ? getLastDailyReset() : getLastWeeklyReset();
-            if ((instance->completed && instance->deleted) && parse_date(instance->startDate) >= lastReset) {
+            if ((instance->completed || instance->deleted) && parse_date(instance->startDate) >= lastReset) {
+                APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + apiTask->item.title + "' already started and completed/deleted since relevant reset on account " + account + " - skipping creation.").c_str());
+                startTask = false;
+                break;
+            }
+
+            // If the instance is not open but completed, check if the completion date was "since last reset"
+            if ((instance->completed || instance->deleted) && (instance->endDate.length() > 5 && parse_date(instance->endDate) >= lastReset)) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + apiTask->item.title + "' already completed since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;

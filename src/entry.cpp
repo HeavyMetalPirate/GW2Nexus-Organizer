@@ -24,7 +24,7 @@ void AddonRender();
 void AddonPostRender();
 void AddonOptions();
 void AddonSimpleShortcut();
-void ProcessKeybind(const char* aIdentifier);
+void ProcessKeybind(const char* aIdentifier, bool isRelease);
 void HandleIdentityChanged(void* eventArgs);
 void HandleAccountName(void* eventArgs);
 void HandleSelfJoin(void* eventArgs);
@@ -41,6 +41,7 @@ OrganizerRepository* organizerRepo = nullptr;
 addon::Settings settings;
 
 ApiTokenService apiTokenService;
+NotificationService notificationService;
 AutoStartService autoStartService;
 
 bool unloading = false;
@@ -82,7 +83,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
 	AddonDef.Version.Minor = 1;
-	AddonDef.Version.Build = 1;
+	AddonDef.Version.Build = 2;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
@@ -91,8 +92,8 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Flags = EAddonFlags_None;
 
 	/* not necessary if hosted on Raidcore, but shown anyway for the example also useful as a backup resource */
-	//AddonDef.Provider = EUpdateProvider_GitHub;
-	//AddonDef.UpdateLink = "https://github.com/RaidcoreGG/GW2Nexus-AddonTemplate";
+	AddonDef.Provider = EUpdateProvider_GitHub;
+	AddonDef.UpdateLink = "https://github.com/HeavyMetalPirate/GW2Nexus-Organizer";
 
 	return &AddonDef;
 }
@@ -111,14 +112,13 @@ void AddonLoad(AddonAPI* aApi)
 	ImGui::SetCurrentContext((ImGuiContext*)APIDefs->ImguiContext); // cast to ImGuiContext*
 	ImGui::SetAllocatorFunctions((void* (*)(size_t, void*))APIDefs->ImguiMalloc, (void(*)(void*, void*))APIDefs->ImguiFree); // on imgui 1.80+
 
-	NexusLink = (NexusLinkData*)APIDefs->GetResource("DL_NEXUS_LINK");
-	MumbleLink = (Mumble::Data*)APIDefs->GetResource("DL_MUMBLE_LINK");
+	NexusLink = (NexusLinkData*)APIDefs->DataLink.Get("DL_NEXUS_LINK");
+	MumbleLink = (Mumble::Data*)APIDefs->DataLink.Get("DL_MUMBLE_LINK");
 
 	LoadSettings();
 
 	organizerRepo = new OrganizerRepository();
 	organizerRepo->initialize();
-
 
 	renderer = Renderer();
 	apiTokenService = ApiTokenService();
@@ -128,40 +128,43 @@ void AddonLoad(AddonAPI* aApi)
 	autoStartService.initialize();
 	autoStartService.startWorker();
 
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_CLOSE", IDB_ICON_CLOSE, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_OPTIONS", IDB_ICON_OPTIONS, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_TRASH", IDB_ICON_TRASH, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_CHECK", IDB_ICON_CHECK, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_ADD", IDB_ICON_ADD, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_REPEAT", IDB_ICON_CLOCK, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_REACTIVATE", IDB_ICON_REACTIVATE, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_START", IDB_ICON_START, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_EDIT", IDB_ICON_EDIT, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_SHORTCUT", IDB_ICON_SHORTCUT, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_SHORTCUT_HOVER", IDB_ICON_SHORTCUT_HOVER, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_NO_REPEAT", IDB_ICON_NO_REPEAT, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_SAVE", IDB_ICON_SAVE, hSelf, nullptr);
-	APIDefs->LoadTextureFromResource("ICON_ORGANIZER_CANCEL", IDB_ICON_CANCEL, hSelf, nullptr);
+	notificationService = NotificationService();
+	
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_CLOSE", IDB_ICON_CLOSE, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_OPTIONS", IDB_ICON_OPTIONS, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_TRASH", IDB_ICON_TRASH, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_CHECK", IDB_ICON_CHECK, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_ADD", IDB_ICON_ADD, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_REPEAT", IDB_ICON_CLOCK, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_REACTIVATE", IDB_ICON_REACTIVATE, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_START", IDB_ICON_START, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_EDIT", IDB_ICON_EDIT, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SHORTCUT", IDB_ICON_SHORTCUT, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SHORTCUT_HOVER", IDB_ICON_SHORTCUT_HOVER, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_NO_REPEAT", IDB_ICON_NO_REPEAT, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SAVE", IDB_ICON_SAVE, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_CANCEL", IDB_ICON_CANCEL, hSelf, nullptr);
 
-	APIDefs->RegisterKeybindWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
-	APIDefs->AddShortcut("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
+	APIDefs->InputBinds.RegisterWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
+	APIDefs->QuickAccess.Add("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
+	APIDefs->QuickAccess.AddContextMenu("ORG_CONTEXT_MENU", "ORG_SHORTCUT", AddonSimpleShortcut);
 
 	// Events
-	APIDefs->SubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
-	APIDefs->SubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
-	APIDefs->SubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
+	APIDefs->Events.Subscribe("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
+	APIDefs->Events.Subscribe("EV_ACCOUNT_NAME", HandleAccountName);
+	APIDefs->Events.Subscribe("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
 
-	APIDefs->SubscribeEvent(EV_NAME_DAILY_RESET, HandleTriggerDailyReset);
-	APIDefs->SubscribeEvent(EV_NAME_WEEKLY_RESET, HandleTriggerWeeklyReset);
+	APIDefs->Events.Subscribe(EV_NAME_DAILY_RESET, HandleTriggerDailyReset);
+	APIDefs->Events.Subscribe(EV_NAME_WEEKLY_RESET, HandleTriggerWeeklyReset);
 
 	// Add an options window and a regular render callback
-	APIDefs->RegisterRender(ERenderType_PreRender, AddonPreRender);
-	APIDefs->RegisterRender(ERenderType_Render, AddonRender);
-	APIDefs->RegisterRender(ERenderType_PostRender, AddonPostRender);
-	//APIDefs->RegisterRender(ERenderType_OptionsRender, AddonOptions);
+	APIDefs->Renderer.Register(ERenderType_PreRender, AddonPreRender);
+	APIDefs->Renderer.Register(ERenderType_Render, AddonRender);
+	APIDefs->Renderer.Register(ERenderType_PostRender, AddonPostRender);
+	//APIDefs->Renderer.Register(ERenderType_OptionsRender, AddonOptions);
 
-	APIDefs->RaiseEventNotification("EV_REQUEST_ACCOUNT_NAME"); // Request account name at load
-	APIDefs->RaiseEventNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
+	APIDefs->Events.RaiseNotification("EV_REQUEST_ACCOUNT_NAME"); // Request account name at load
+	APIDefs->Events.RaiseNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#00ff00>Organizer</c> was loaded.");
 }
@@ -174,6 +177,7 @@ void AddonUnload()
 {
 	/* Stop components */
 	unloading = true;
+	notificationService.unload();
 	apiTokenService.stopService();
 	autoStartService.endWorker();
 	organizerRepo->unload();
@@ -182,19 +186,20 @@ void AddonUnload()
 	StoreSettings();
 	organizerRepo->save();
 
-	APIDefs->RemoveShortcut("ORG_SHORTCUT");
-	APIDefs->DeregisterKeybind("ORG_KEYBIND");
+	APIDefs->QuickAccess.Remove("ORG_SHORTCUT");
+	APIDefs->QuickAccess.RemoveContextMenu("ORG_CONTEXT_MENU");
+	APIDefs->InputBinds.Deregister("ORG_KEYBIND");
 
-	APIDefs->UnsubscribeEvent("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
-	APIDefs->UnsubscribeEvent("EV_ACCOUNT_NAME", HandleAccountName);
-	APIDefs->UnsubscribeEvent("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
+	APIDefs->Events.Unsubscribe("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
+	APIDefs->Events.Unsubscribe("EV_ACCOUNT_NAME", HandleAccountName);
+	APIDefs->Events.Unsubscribe("EV_ARCDPS_SELF_JOIN", HandleSelfJoin);
 
-	APIDefs->UnsubscribeEvent(EV_NAME_DAILY_RESET, HandleTriggerDailyReset);
-	APIDefs->UnsubscribeEvent(EV_NAME_WEEKLY_RESET, HandleTriggerWeeklyReset);
+	APIDefs->Events.Unsubscribe(EV_NAME_DAILY_RESET, HandleTriggerDailyReset);
+	APIDefs->Events.Unsubscribe(EV_NAME_WEEKLY_RESET, HandleTriggerWeeklyReset);
 
-	APIDefs->DeregisterRender(AddonPreRender);
-	APIDefs->DeregisterRender(AddonRender);
-	APIDefs->DeregisterRender(AddonPostRender);
+	APIDefs->Renderer.Deregister(AddonPreRender);
+	APIDefs->Renderer.Deregister(AddonRender);
+	APIDefs->Renderer.Deregister(AddonPostRender);
 	//APIDefs->DeregisterRender(AddonOptions);
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#ff0000>Signing off</c>, it was an honor commander.");
@@ -208,6 +213,7 @@ void AddonUnload()
 void AddonRender()
 {
 	renderer.render();
+	notificationService.render();
 }
 
 ///----------------------------------------------------------------------------------------------------
@@ -220,17 +226,20 @@ void AddonOptions()
 }
 
 void AddonSimpleShortcut() {
-	// TODO Impl
+	ImGui::Checkbox("TODOs", &todoListRendered);
+	ImGui::Checkbox("Configuration", &organizerRendered);
 }
 
 void AddonPreRender() {
 	renderer.preRender();
+	notificationService.preRender();
 }
 void AddonPostRender() {
 	renderer.postRender();
+	notificationService.postRender();
 }
 
-void ProcessKeybind(const char* aIdentifier)
+void ProcessKeybind(const char* aIdentifier, bool isRelease)
 {
 	if (strcmp(aIdentifier, "ORG_KEYBIND") == 0)
 	{
