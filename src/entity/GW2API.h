@@ -23,7 +23,7 @@ namespace gw2 {
 			int wvw_rank;
 		};
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Account, id, name, age, world, guilds, guild_leader, created, access, commander, fractal_level, daily_ap, monthly_ap, wvw_rank)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Account, id, name, age, world, guilds, guild_leader, created, access, commander, fractal_level, daily_ap, monthly_ap, wvw_rank)
 	}
 
 	namespace token {
@@ -32,14 +32,14 @@ namespace gw2 {
 			std::string name;
 			std::vector<std::string> permissions;
 		};
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ApiToken, id, name, permissions);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ApiToken, id, name, permissions);
 	}
 
 	namespace crafting {
 		struct DailyCrafting {
 			std::vector<std::string> recipes;
 		};
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DailyCrafting, recipes);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(DailyCrafting, recipes);
 	}
 
 	namespace dungeon {
@@ -54,8 +54,8 @@ namespace gw2 {
 			
 		};
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Path, id, type);
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Dungeon, id, paths);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Path, id, type);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Dungeon, id, paths);
 	}
 
 	namespace world {
@@ -65,8 +65,8 @@ namespace gw2 {
 		struct WorldBoss {
 			std::vector<std::string> worldbosses;
 		};
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MapChests, chests);
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WorldBoss, worldbosses);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MapChests, chests);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(WorldBoss, worldbosses);
 	}
 
 	namespace raid {
@@ -85,9 +85,9 @@ namespace gw2 {
 			std::vector<Wing> wings;
 		};
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Event, id, type)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Wing, id, events)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Raid, id, wings)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Event, id, type)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Wing, id, events)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Raid, id, wings)
 	}
 
 	namespace wizardsvault {
@@ -112,8 +112,8 @@ namespace gw2 {
 			
 		};
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Objective, id, title, track, acclaim, progress_current, progress_complete, claimed);
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MetaProgress, meta_progress_current, meta_progress_complete, meta_reward_item_id, meta_reward_astral, meta_reward_claimed, objectives);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Objective, id, title, track, acclaim, progress_current, progress_complete, claimed);
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MetaProgress, meta_progress_current, meta_progress_complete, meta_reward_item_id, meta_reward_astral, meta_reward_claimed, objectives);
 	}
 
 	namespace achievements {
@@ -166,6 +166,4 @@ namespace gw2 {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Achievement, id, icon, name, description, requirement, locked_text, type, flags, tiers, rewards, prerequisites);
 	}
 }
-
-
 #endif

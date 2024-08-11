@@ -63,6 +63,8 @@
     <ClInclude Include="service\AutoStartService.h" />
     <ClInclude Include="service\SharedServices.h" />
     <ClInclude Include="service\NotificationService.h" />
+    <ClInclude Include="OmegaGlobals.h" />
+    <ClInclude Include="utility\DateTime.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">

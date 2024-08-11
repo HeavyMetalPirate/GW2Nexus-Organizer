@@ -67,7 +67,7 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
     char timezoneSign;
 
     // Parse the date/time string in ISO 8601 format
-    std::regex dateTimeRegex(R"(^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2}):(\d{2})$)");
+    std::regex dateTimeRegex(R"(^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})$)");
     std::smatch matches;
     if (std::regex_match(dateTimeStr, matches, dateTimeRegex)) {
         year = std::stoi(matches[1].str());
@@ -214,6 +214,8 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
         }
         valueChanged = true;
     }
+    std::string text = "Zone: ";
+    text.push_back(timezoneSign);
 
     ImGui::EndChild();
 
@@ -225,7 +227,7 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
             << std::setw(2) << std::setfill('0') << hour << ":"
             << std::setw(2) << std::setfill('0') << minute << ":"
             << std::setw(2) << std::setfill('0') << second
-            << timezoneSign << std::setw(2) << std::setfill('0') << timezoneOffsetHour << ":"
+            << timezoneSign << std::setw(2) << std::setfill('0') << timezoneOffsetHour
             << std::setw(2) << std::setfill('0') << timezoneOffsetMinute;
         dateTimeStr = oss.str();
     }

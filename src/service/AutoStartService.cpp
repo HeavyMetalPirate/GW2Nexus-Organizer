@@ -81,20 +81,20 @@ void AutoStartService::CheckNotifications() {
         if (!strContains(instance->owner, owner)) continue; // not owner of task
 
         try {
-            auto dueDate = parse_date(instance->endDate);
-            auto zonedDue = std::chrono::zoned_time(std::chrono::current_zone(), dueDate);
-            int minutes = settings.notifications.minutesUntilDue > 0 ? settings.notifications.minutesUntilDue : 15;
-            auto now = std::chrono::system_clock::now() + std::chrono::minutes(minutes); // TODO 15 minutes => read from settings instead
-            auto zonedNow = std::chrono::zoned_time(std::chrono::current_zone(), now);
 
-            if (dueDate.time_since_epoch() < zonedNow.get_local_time().time_since_epoch()) {
+            auto dueDate = DateTime(instance->endDate);
+            auto now = DateTime::nowLocal();
+            int minutes = settings.notifications.minutesUntilDue > 0 ? settings.notifications.minutesUntilDue : 15;
+            now.addMinutes(minutes);
+
+            if (dueDate < now) {
                 // fire notification pewpew
                 toast::ToastData* data = new toast::ToastData();
                 data->toastId = "taskNotification_" + std::to_string(instance->id);
 
                 OrganizerItem* item = organizerRepo->getConfigurableItemById(instance->itemId);
                 data->title = item->title;
-                data->text = "Task due: " + replaceNewLines(format_date_output(instance->endDate));
+                data->text = "Task due: " + dueDate.toStringNice();
                 data->chatLink = "";
                 data->texture = nullptr; // possible TODO if I have a cool icon
 
@@ -172,14 +172,15 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             }
 
             // If the instance is not open but completed or deleted, check if the begin date was "since last reset"
-            std::chrono::time_point lastReset = mode == RepeatMode::DAILY ? getLastDailyReset() : getLastWeeklyReset();
-            if ((instance->completed || instance->deleted) && parse_date(instance->startDate) >= lastReset) {
+            auto lastReset = mode == RepeatMode::DAILY ? DateTime::nowLocal().getLastDaily() : DateTime::nowLocal().getLastWeekly();
+            auto startDate = DateTime(instance->startDate);  
+            if ((instance->completed || instance->deleted) && startDate > lastReset) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + item->title + "' already started and completed/deleted since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;
             }
 
-            if ((instance->completed || instance->deleted) && (instance->endDate.length() > 5 && parse_date(instance->endDate) >= lastReset)) {
+            if ((instance->completed || instance->deleted) && (instance->endDate.length() > 5 && DateTime(instance->endDate) > lastReset)) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + item->title + "' already completed since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;
@@ -187,8 +188,9 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         }
         if (startTask) {
             OrganizerItemInstance newInstance = {};
-            newInstance.startDate = format_date(std::chrono::system_clock::now());
-            newInstance.endDate = format_date(mode == RepeatMode::DAILY ? getNextDailyReset() : getNextWeeklyReset());
+            newInstance.startDate = DateTime::nowLocal().toString();
+            auto nextReset = mode == RepeatMode::DAILY ? DateTime::nowLocal().getNextDaily() : DateTime::nowLocal().getNextWeekly();
+            newInstance.endDate = nextReset.toString();
             newInstance.completed = false;
             newInstance.itemId = item->id;
             newInstance.owner = account;
@@ -219,15 +221,17 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             }
 
             // If the instance is not open but completed, check if the start date was "since last reset"
-            std::chrono::time_point lastReset = mode == RepeatMode::DAILY ? getLastDailyReset() : getLastWeeklyReset();
-            if ((instance->completed || instance->deleted) && parse_date(instance->startDate) >= lastReset) {
+            auto lastReset = mode == RepeatMode::DAILY ? DateTime::nowLocal().getLastDaily() : DateTime::nowLocal().getLastWeekly();
+            auto startDate = DateTime(instance->startDate);
+            
+            if ((instance->completed || instance->deleted) && startDate > lastReset) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + apiTask->item.title + "' already started and completed/deleted since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;
             }
 
             // If the instance is not open but completed, check if the completion date was "since last reset"
-            if ((instance->completed || instance->deleted) && (instance->endDate.length() > 5 && parse_date(instance->endDate) >= lastReset)) {
+            if ((instance->completed || instance->deleted) && (instance->endDate.length() > 5 && DateTime(instance->endDate) > lastReset)) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + apiTask->item.title + "' already completed since relevant reset on account " + account + " - skipping creation.").c_str());
                 startTask = false;
                 break;
@@ -235,9 +239,9 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         }
         if (startTask) {
             OrganizerItemInstance newInstance = {};
-            newInstance.startDate = format_date(std::chrono::system_clock::now());
-            newInstance.endDate = format_date(mode == RepeatMode::DAILY ? getNextDailyReset() : getNextWeeklyReset());
-            newInstance.completed = false;
+            newInstance.startDate = DateTime::nowLocal().toString();
+            auto nextReset = mode == RepeatMode::DAILY ? DateTime::nowLocal().getNextDaily() : DateTime::nowLocal().getNextWeekly();
+            newInstance.endDate = nextReset.toString(); newInstance.completed = false;
             newInstance.itemId = apiTask->item.id;
             newInstance.owner = account;
             organizerRepo->addTaskInstance(new OrganizerItemInstance(newInstance));
@@ -245,7 +249,7 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         }
     }
 }
-
+/*
 std::chrono::system_clock::time_point AutoStartService::getLastDailyReset() const {
     using namespace std::chrono;
 
@@ -310,6 +314,7 @@ std::chrono::system_clock::time_point AutoStartService::getNextWeeklyReset() con
 
     return next_weekly_reset;
 }
+*/
 
 // =================================================================================
 // Checkers

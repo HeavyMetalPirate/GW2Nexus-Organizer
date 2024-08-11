@@ -1,7 +1,9 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include <string>
 #include <map>
+#include <vector>
 
 static const char* ADDON_NAME = "Organizer";
 static const std::string baseUrl = "https://api.guildwars2.com";

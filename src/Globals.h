@@ -26,28 +26,16 @@
 #include <thread>
 #include <iostream>
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_internal.h"
-#include "nexus/Nexus.h"
-#include "mumble/Mumble.h"
-
-#include "Constants.h"
-#include "Settings.h"
+#include "OmegaGlobals.h"
 #include "resource.h"
-#include "utility/DateTimeUtils.h"
+//#include "utility/DateTimeUtils.h" /* oh no, deprecation! */
+#include "utility/DateTime.h"
 #include "utility/StringUtils.h"
 
 #include "entity/OrganizerItems.h"
 #include "entity/GW2API.h"
 
 namespace fs = std::filesystem;
-
-extern AddonDefinition AddonDef;
-extern HMODULE hSelf;
-extern AddonAPI* APIDefs;
-extern Mumble::Data* MumbleLink;
-extern NexusLinkData* NexusLink;
-extern addon::Settings settings;
 
 extern bool organizerRendered;
 extern bool todoListRendered;

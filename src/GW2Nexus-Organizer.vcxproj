@@ -163,7 +163,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -187,6 +187,7 @@
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="mumble\Mumble.h" />
     <ClInclude Include="nexus\Nexus.h" />
+    <ClInclude Include="OmegaGlobals.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="service\AddonRenderer.h" />
     <ClInclude Include="service\ApiTokenService.h" />
@@ -197,6 +198,7 @@
     <ClInclude Include="service\OrganizerRepository.h" />
     <ClInclude Include="service\SharedServices.h" />
     <ClInclude Include="Settings.h" />
+    <ClInclude Include="utility\DateTime.h" />
     <ClInclude Include="utility\DateTimeUtils.h" />
     <ClInclude Include="utility\ImGuiComponents.h" />
     <ClInclude Include="utility\StringUtils.h" />

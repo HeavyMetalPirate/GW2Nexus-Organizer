@@ -96,7 +96,7 @@ void OrganizerRepository::initialize() {
 		dailyWV->originalId = "wizardsvault_daily";
 		OrganizerItem dailyWVitem = OrganizerItem();
 		dailyWVitem.apiId = "wizardsvault_daily";
-		dailyWVitem.title = "Daiy Wizards Vault";
+		dailyWVitem.title = "Daily Wizards Vault";
 		dailyWVitem.description = "Complete the daily Wizards Vault meta achievement.";
 		dailyWVitem.type = ItemType::DAILY_WIZARD_VAULT;
 		dailyWVitem.repeatMode = RepeatMode::DAILY;
@@ -226,9 +226,18 @@ void OrganizerRepository::addApiTaskConfigurable(ApiTaskConfigurable* configurab
 	if (configurable->item.id > 0) return; // already known
 	
 	// check if we already know this item by its originalId
-	// in theory we should not get id collisions in any way but who knows, right? /shrug
+	// in case we already have that id stored, update the base item
 	for (auto c : apiTaskConfigurables) {
-		if (c->originalId == configurable->originalId) return;
+		if (c->originalId == configurable->originalId) {
+			// Update the base item, then leave it; just update the interesting flags and leave the user
+			// configured stuff like item ids, subscriptions etc!
+			c->item.title = configurable->item.title;
+			c->item.description = configurable->item.description;
+			c->item.type = configurable->item.type;
+			c->item.repeatMode = configurable->item.repeatMode;
+			save();
+			return;
+		}
 	}
 
 	int nextId = getNextApiTaskConfigurableId();
@@ -653,7 +662,7 @@ void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountNam
 				if (repo->wizardsVaultDaily[accountName].meta_reward_claimed) {
 					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
 					task->completed = true;
-					task->completionDate = format_date(std::chrono::system_clock::now());
+					task->completionDate = DateTime::nowLocal().toString();
 				}
 			} 
 			else if (item->type == ItemType::WEEKLY_WIZARDS_VAULT) {
@@ -661,7 +670,7 @@ void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountNam
 				if (repo->wizardsVaultWeekly[accountName].meta_reward_claimed) {
 					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
 					task->completed = true;
-					task->completionDate = format_date(std::chrono::system_clock::now());
+					task->completionDate = DateTime::nowLocal().toString();
 				}
 			}
 			/*
@@ -687,7 +696,7 @@ void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountNam
 				if (raidCompleted) {
 					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
 					task->completed = true;
-					task->completionDate = format_date(std::chrono::system_clock::now());
+					task->completionDate = DateTime::nowLocal().toString();
 				}
 			}
 			else if (dungeonPaths.contains(item->apiId)) {
@@ -704,7 +713,7 @@ void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountNam
 				if (dungeonCompleted) {
 					APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + accountName + "'.").c_str());
 					task->completed = true;
-					task->completionDate = format_date(std::chrono::system_clock::now());
+					task->completionDate = DateTime::nowLocal().toString();
 				}
 			}
 			else {
@@ -714,7 +723,7 @@ void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountNam
 					if (account == accountName) {
 						APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Detected completion of task '" + item->title + "' for account '" + account + "'.").c_str());
 						task->completed = true;
-						task->completionDate = format_date(std::chrono::system_clock::now());
+						task->completionDate = DateTime::nowLocal().toString();
 					}
 				}
 			}

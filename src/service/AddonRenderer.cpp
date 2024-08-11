@@ -60,7 +60,6 @@ int doneCurrentPage = 1;
 int configItemsPerPage = 10;
 int configCurrentPage = 1;
 
-
 void Renderer::preRender() {
     if (iconClose == nullptr)
         iconClose = APIDefs->Textures.Get("ICON_ORGANIZER_CLOSE");
@@ -90,9 +89,33 @@ void Renderer::preRender() {
     if (accountName.empty()) displayOwnOnly = false;
 }
 void Renderer::render() {
-    renderNewTaskDialog();
-    renderTodoList();
-	renderOrganizer();
+    try {
+        renderNewTaskDialog();
+    }
+    catch (const std::exception& e) {
+        APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("AddonRenderer::Render():RenderNewTaskDialog(): " + std::string(e.what())).c_str());
+    }
+    catch (...) {
+        APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("Unknown exception while calling AddonRenderer::Render():RenderNewTaskDialog()"));
+    }
+    try {
+        renderTodoList();
+    }
+    catch (const std::exception& e) {
+        APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("AddonRenderer::Render():RenderTodoList(): " + std::string(e.what())).c_str());
+    }
+    catch (...) {
+        APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("Unknown exception while calling AddonRenderer::Render():RenderTodoList()"));
+    }
+    try {
+        renderOrganizer();
+    }
+    catch (const std::exception& e) {
+        APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("AddonRenderer::Render():RenderOrganizer(): " + std::string(e.what())).c_str());
+    }
+    catch (...) {
+        APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("Unknown exception while calling AddonRenderer::Render():RenderOrganizer()"));
+    }
 }
 void Renderer::postRender() {
 	// TODO impl
@@ -147,7 +170,8 @@ void renderNewTaskDialog() {
 
         if (ImGui::Checkbox("Has due date", &newInstance.hasEndDate)) {
             if (newInstance.hasEndDate) {
-                newInstance.endDate = format_date(std::chrono::system_clock::now());
+                DateTime now = DateTime::nowLocal();
+                newInstance.endDate = now.toString();
             }
             else {
                 newInstance.endDate = "";
@@ -204,16 +228,17 @@ void renderTodoList() {
         ImGui::PushFont((ImFont*)NexusLink->FontBig);
         ImGui::Text("TODOs");
         ImGui::PopFont();
-        ImGui::SameLine(ImGui::GetWindowWidth() - (3*30 + 5)); // 3* buttons plus 5 generic to the edge
+        ImGui::SameLine(ImGui::GetWindowWidth() - (3 * (35 * NexusLink->Scaling) + 5)); // 3* buttons plus 5 generic to the edge
         if (iconAdd != nullptr) {
-            if (ImGui::ImageButton((ImTextureID)iconAdd->Resource, { 20,20 })) {
+            if (ImGui::ImageButton((ImTextureID)iconAdd->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
                 renderAddNewDialog = true;
                 newItem = {};
                 newItem.type = ItemType::DEFAULT;
                 newItem.repeatMode = RepeatMode::ONCE;
 
                 newInstance = {};
-                newInstance.startDate = format_date(std::chrono::system_clock::now());
+                DateTime now = DateTime::nowLocal();
+                newInstance.startDate = now.toString();
                 newInstance.endDate = "";
                 newInstance.completed = false;
             }
@@ -226,14 +251,15 @@ void renderTodoList() {
                 newItem.repeatMode = RepeatMode::ONCE;
 
                 newInstance = {};
-                newInstance.startDate = format_date(std::chrono::system_clock::now());
+                DateTime now = DateTime::nowLocal();
+                newInstance.startDate = now.toString();
                 newInstance.endDate = "";
                 newInstance.completed = false;
             }
         }
         ImGui::SameLine();
         if (iconOptions != nullptr) {
-            if (ImGui::ImageButton((ImTextureID)iconOptions->Resource, { 20,20 })) {
+            if (ImGui::ImageButton((ImTextureID)iconOptions->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
                 organizerRendered = !organizerRendered;
             }
         }
@@ -244,7 +270,7 @@ void renderTodoList() {
         }
         ImGui::SameLine();
         if (iconClose != nullptr) {
-            if (ImGui::ImageButton((ImTextureID)iconClose->Resource, { 20,20 })) {
+            if (ImGui::ImageButton((ImTextureID)iconClose->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
                 todoListRendered = false;
             }
         }
@@ -271,7 +297,8 @@ void renderTodoList() {
                 newItem.repeatMode = RepeatMode::ONCE;
 
                 newInstance = {};
-                newInstance.startDate = format_date(std::chrono::system_clock::now());
+                DateTime now = DateTime::nowLocal();
+                newInstance.startDate = now.toString();
                 newInstance.endDate = "";
                 newInstance.completed = false;
 
@@ -312,15 +339,15 @@ void renderTodoList() {
         if (ImGui::BeginChild("TodoContent")) {
             ImVec2 window_size = ImGui::GetWindowSize();
             float table_width = window_size.x;
-            float rightColumnWidth = 25.0f;
-            float leftColumnWidth = table_width - (2 * rightColumnWidth) - 25.0f;
+            float rightColumnWidth = 30.0f * NexusLink->Scaling;
+            float leftColumnWidth = table_width - (2 * rightColumnWidth) - (30.0f * NexusLink->Scaling);
             if (ImGui::GetCurrentWindow()->ScrollbarY) {
-                leftColumnWidth -= 10.0f;
+                leftColumnWidth -= (10.0f * NexusLink->Scaling);
             }
 
             if (ImGui::BeginTable("TODOTable", 4, ImGuiTableFlags_BordersH)) {
-                ImGui::TableSetupColumn("##ChangeInterval", ImGuiTableColumnFlags_WidthFixed, 25.0f);
-                ImGui::TableSetupColumn("Task", ImGuiTableColumnFlags_WidthFixed, leftColumnWidth - 25.0f);
+                ImGui::TableSetupColumn("##ChangeInterval", ImGuiTableColumnFlags_WidthFixed, 30.0f * NexusLink->Scaling);
+                ImGui::TableSetupColumn("Task", ImGuiTableColumnFlags_WidthFixed, leftColumnWidth - (30.0f * NexusLink->Scaling));
                 ImGui::TableSetupColumn("##Complete", ImGuiTableColumnFlags_WidthFixed, rightColumnWidth);
                 ImGui::TableSetupColumn("##Delete", ImGuiTableColumnFlags_WidthFixed, rightColumnWidth);
                 ImGui::TableSetupScrollFreeze(0, 1);
@@ -352,7 +379,7 @@ void renderTodoList() {
                         if (iconRepeat != nullptr) {
                             ImGui::PushID(hashString("changeinterval_" + std::to_string(task->id)));
                             ImTextureID buttonTex = item->repeatMode == RepeatMode::ONCE ? iconNoRepeat->Resource : iconRepeat->Resource;
-                            if (ImGui::ImageButton(buttonTex, { 20,20 }, { 0,0 }, { 1,1 })) {
+                            if (ImGui::ImageButton(buttonTex, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                                 renderChangeInterval = true;
                                 changeIntervalPos = ImGui::GetMousePos();
                                 changeIntervalItem = item;
@@ -387,10 +414,8 @@ void renderTodoList() {
                         ImGui::Text(item->title.c_str());
                     }
                     else {
-                        auto dueDate = parse_date(task->endDate);
-                        auto now = std::chrono::system_clock::now();
-                        auto zonedNow = std::chrono::zoned_time(std::chrono::current_zone(), now);
-                        if (dueDate.time_since_epoch() < zonedNow.get_local_time().time_since_epoch()) {
+                        DateTime dueDate = DateTime(task->endDate);
+                        if (dueDate.isBeforeNow()) {
                             ImGui::TextColored(colorRed, item->title.c_str());
                         }
                         else {
@@ -409,8 +434,8 @@ void renderTodoList() {
                         ImGui::Text(RepeatModeValue(item->repeatMode));
                         ImGui::Text(("Owner: " + replaceNewLines(task->owner)).c_str());
                         if (!task->endDate.empty()) {
-                            std::string end = replaceNewLines(format_date_output(task->endDate));
-                            ImGui::Text(("Due: " + end).c_str());
+                            DateTime endDate = DateTime(task->endDate);
+                            ImGui::Text(("Due: " + endDate.toStringNice()).c_str());
                         }
                         ImGui::EndTooltip();
                     }
@@ -425,21 +450,34 @@ void renderTodoList() {
                     ImGui::TableNextColumn(); // Finish button
                     if (iconCheck != nullptr) {
                         ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20,20 }, { 0,0 }, { 1,1 })) { 
-                            task->completionDate = format_date(std::chrono::system_clock::now());
+                        if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                            task->completionDate = DateTime::nowLocal().toString();
                             task->completed = true;
                             organizerRepo->save();
                         }
                         ImGui::PopID();
                     }
+                    else {
+                        if (ImGui::Button(("C##" + std::to_string(task->id)).c_str(), {20,20})) {
+                            task->completionDate = DateTime::nowLocal().toString();
+                            task->completed = true;
+                            organizerRepo->save();
+                        }
+                    }
                     ImGui::TableNextColumn(); // Delete button
                     if (iconTrash != nullptr) {
                         ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) { 
+                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                             task->deleted = true;
                             organizerRepo->save();
                         }
                         ImGui::PopID();
+                    }
+                    else {
+                        if (ImGui::Button(("D##" + std::to_string(task->id)).c_str(), { 20,20 })) {
+                            task->deleted = true;
+                            organizerRepo->save();
+                        }
                     }
                 }
 
@@ -455,7 +493,7 @@ void renderTodoList() {
             | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
             for (int i = 0; i < static_cast<int>(RepeatMode::COUNT); ++i) {
                 RepeatMode currentEnum = static_cast<RepeatMode>(i);
-                if (ImGui::Button(RepeatModeValue(currentEnum), { 150,20 })) {
+                if (ImGui::Button(RepeatModeValue(currentEnum), { 150 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
                     if (!changeIntervalItem->accountConfiguration.contains(accountName) && !accountName.empty()) {
                         changeIntervalItem->accountConfiguration.emplace(accountName, currentEnum == RepeatMode::ONCE ? false : true);
                     }
@@ -468,10 +506,11 @@ void renderTodoList() {
                     renderChangeInterval = false;
                 }
             }
-            if (ImGui::Button("Cancel", { 150,20 })) {
+            if (ImGui::Button("Cancel", { 150 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
                 changeIntervalItem = nullptr;
                 renderChangeInterval = false;
             }
+            ImGui::End();
         }
     }
 }
@@ -480,36 +519,45 @@ void renderOrganizer() {
     if (!organizerRendered) return;
 
     // Create the main window
-    ImGui::SetNextWindowSize(ImVec2(960.0f, 770.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(960.0f * NexusLink->Scaling, 770.0f * NexusLink->Scaling), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Organizer", &organizerRendered, ImGuiWindowFlags_NoCollapse)) {
 
         // Create a child window for the tab bar on the left
-        ImGui::BeginChild("Left Pane", ImVec2(140, 0), true);
+        if (ImGui::BeginChild("Left Pane", ImVec2(140 * NexusLink->Scaling, 0), true)) {
 
-        // Render vertical card-style tabs
+            // Render vertical card-style tabs
 
-        if (CardTab("Open Tasks", selected_tab == 0)) selected_tab = 0;
-        if (CardTab("Ingame activities", selected_tab == 1)) selected_tab = 1;
-        if (CardTab("Completed Tasks", selected_tab == 2)) selected_tab = 2;
-        if (CardTab("Task configuration", selected_tab == 3)) selected_tab = 3;
-        if (CardTab("Settings", selected_tab == 4)) selected_tab = 4;
+            if (CardTab("Open Tasks", selected_tab == 0)) selected_tab = 0;
+            if (CardTab("Ingame activities", selected_tab == 1)) selected_tab = 1;
+            if (CardTab("Completed Tasks", selected_tab == 2)) selected_tab = 2;
+            if (CardTab("Task configuration", selected_tab == 3)) selected_tab = 3;
+            if (CardTab("Settings", selected_tab == 4)) selected_tab = 4;
 
-        ImGui::EndChild();
+            ImGui::EndChild();
+        }
 
         // Create a child window for the content on the right
         ImGui::SameLine();
-        ImGui::BeginChild("Right Pane", ImVec2(0, 0), true);
+        if (ImGui::BeginChild("Right Pane", ImVec2(0, 0), true)) {
+            try {
+                switch (selected_tab) {
+                case 0: renderCurrentTasks(); break;
+                case 1: renderAPITasks(); break;
+                case 2: renderDoneTasks(); break;
+                case 3: renderTaskConfiguration(); break;
+                case 4: renderSettings(); break;
+                default: ImGui::Text(("Unknown Tab: " + std::to_string(selected_tab)).c_str());
+                }
+            }
+            catch (const std::exception& e) {
+                APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("AddonRenderer::RenderOrganizer() with selected_tab " + std::to_string(selected_tab) + ": " + std::string(e.what())).c_str());
+            }
+            catch (...) {
+                APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("Unknown exception while calling AddonRenderer::RenderOrganizer() with selected_tab " + std::to_string(selected_tab)).c_str());
+            }
 
-        switch (selected_tab) {
-            case 0: renderCurrentTasks(); break;
-            case 1: renderAPITasks(); break;
-            case 2: renderDoneTasks(); break;
-            case 3: renderTaskConfiguration(); break;
-            case 4: renderSettings(); break;
-            default: ImGui::Text(("Unknown Tab: " + std::to_string(selected_tab)).c_str());
+            ImGui::EndChild();
         }
-
-        ImGui::EndChild();
 
         ImGui::End();
     }
@@ -525,7 +573,7 @@ void renderCurrentTasks() {
             newItem.repeatMode = RepeatMode::ONCE;
 
             newInstance = {};
-            newInstance.startDate = format_date(std::chrono::system_clock::now());
+            newInstance.startDate = DateTime::nowLocal().toString();
             newInstance.endDate = "";
             newInstance.completed = false;
         }
@@ -572,7 +620,7 @@ void renderCurrentTasks() {
 
         if (ImGui::Checkbox("Has due date", &newInstance.hasEndDate)) {
             if (newInstance.hasEndDate) {
-                newInstance.endDate = format_date(std::chrono::system_clock::now());
+                newInstance.endDate = DateTime::nowLocal().toString();
             }
             else {
                 newInstance.endDate = "";
@@ -662,28 +710,25 @@ void renderCurrentTasks() {
             ImGui::TableNextColumn(); 
             ImGui::Text(task->owner.c_str());
             ImGui::TableNextColumn(); 
-            ImGui::Text(format_date_output(task->startDate).c_str());
+            ImGui::Text(DateTime(task->startDate).toStringNiceNewline().c_str());
             ImGui::TableNextColumn(); 
             if (task->endDate.empty()) {
                 ImGui::Text("-");
             }
             else {
-                auto dueDate = parse_date(task->endDate);
-                auto now = std::chrono::system_clock::now();
-                auto zonedNow = std::chrono::zoned_time(std::chrono::current_zone(), now);
-                
-                if (dueDate.time_since_epoch() < zonedNow.get_local_time().time_since_epoch()) {
-                    ImGui::TextColored(colorRed, format_date_output(task->endDate).c_str());
+                auto dueDate = DateTime(task->endDate);               
+                if (dueDate.isBeforeNow()) {
+                    ImGui::TextColored(colorRed, dueDate.toStringNiceNewline().c_str());
                 }
                 else {
-                    ImGui::Text(format_date_output(task->endDate).c_str());
+                    ImGui::Text(dueDate.toStringNiceNewline().c_str());
                 }
             }
             ImGui::TableNextColumn(); // Finish button
             if (iconCheck != nullptr) {
                 ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
-                    task->completionDate = format_date(std::chrono::system_clock::now());
+                if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                    task->completionDate = DateTime::nowLocal().toString();
                     task->completed = true;
                     organizerRepo->save();
                 }
@@ -695,8 +740,8 @@ void renderCurrentTasks() {
                 }
             }
             else {
-                if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), { 20,20 })) {
-                    task->completionDate = format_date(std::chrono::system_clock::now());
+                if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), { 20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
+                    task->completionDate = DateTime::nowLocal().toString();
                     task->completed = true;
                     organizerRepo->save();
                 }
@@ -704,7 +749,7 @@ void renderCurrentTasks() {
             ImGui::TableNextColumn(); // Delete button
             if (iconTrash != nullptr) {
                 ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                     task->deleted = true;
                     organizerRepo->save();
                 }
@@ -716,7 +761,7 @@ void renderCurrentTasks() {
                 }
             }
             else {
-                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), {20,20})) {
+                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), {20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
                     task->deleted = true;
                     organizerRepo->save();
                 }
@@ -729,84 +774,64 @@ void renderAPITasks() {
 
     if (ImGui::CollapsingHeader("Wizards Vault")) {
         ImGui::SetCursorPosX(30);
-        ApiTaskConfigurable* dailyWv = organizerRepo->getApiTaskConfigurableByOriginalId("wizardsvault_daily");
-        if (dailyWv == nullptr) {
-            ImGui::Text("Daily Meta achievement tracking not available at this time!");
-        }
-        else {
-            if (dailyWv->accountConfiguration.count(accountName) == 0) {
-                dailyWv->accountConfiguration.emplace(accountName, false);
-            }
-            if (ImGui::Checkbox("Auto track daily meta achievement", &dailyWv->accountConfiguration[accountName])) {
-                organizerRepo->save();
-                APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
-            }
-        }
-        ImGui::SetCursorPosX(30);
-        ApiTaskConfigurable* weeklyWv = organizerRepo->getApiTaskConfigurableByOriginalId("wizardsvault_weekly");
-        if (weeklyWv == nullptr || accountName.empty()) {
-            ImGui::Text("Weekly Meta achievement tracking not available at this time!");
-        }
-        else {
-            if (weeklyWv->accountConfiguration.count(accountName) == 0) {
-                weeklyWv->accountConfiguration.emplace(accountName, false);
-            }
-            if (ImGui::Checkbox("Auto track weekly meta achievement", &weeklyWv->accountConfiguration[accountName])) {
-                organizerRepo->save();
-                APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
-            }
-        }
 
-        for (auto progress : organizerRepo->wizardsVaultDaily) {
+        if (organizerRepo->wizardsVaultDaily.empty()) {
+            ImGui::TextWrapped("No API key configured or data loading for account not successful.");
+            ImGui::TextWrapped("Please go to the Settings tab and configure a valid API key with at least 'account' and 'progress' permissions!");
+            ImGui::TextWrapped("(Note: data loading from API can be slow at times, this warning will disappear once Wizards Vault data has been successfully loaded)");
+        }
+        else {
+            ApiTaskConfigurable* dailyWv = organizerRepo->getApiTaskConfigurableByOriginalId("wizardsvault_daily");
+            if (dailyWv == nullptr || accountName.empty()) {
+                ImGui::Text("Daily Meta achievement tracking not available at this time!");
+            }
+            else {
+                if (dailyWv->accountConfiguration.count(accountName) == 0) {
+                    dailyWv->accountConfiguration.emplace(accountName, false);
+                }
+                if (ImGui::Checkbox("Auto track daily meta achievement", &dailyWv->accountConfiguration[accountName])) {
+                    organizerRepo->save();
+                    APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
+                }
+            }
             ImGui::SetCursorPosX(30);
-            if (ImGui::CollapsingHeader(("Progress for account: " + progress.first).c_str())) {
+            ApiTaskConfigurable* weeklyWv = organizerRepo->getApiTaskConfigurableByOriginalId("wizardsvault_weekly");
+            if (weeklyWv == nullptr || accountName.empty()) {
+                ImGui::Text("Weekly Meta achievement tracking not available at this time!");
+            }
+            else {
+                if (weeklyWv->accountConfiguration.count(accountName) == 0) {
+                    weeklyWv->accountConfiguration.emplace(accountName, false);
+                }
+                if (ImGui::Checkbox("Auto track weekly meta achievement", &weeklyWv->accountConfiguration[accountName])) {
+                    organizerRepo->save();
+                    APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
+                }
+            }
+
+            for (auto progress : organizerRepo->wizardsVaultDaily) {
                 ImGui::SetCursorPosX(30);
-                if (ImGui::BeginTable(("WizardVaultTable" + progress.first).c_str(), 4, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
-                    ImGui::TableSetupColumn("Title", 0, 0.6f);
-                    ImGui::TableSetupColumn("Track", 0, 0.05f);
-                    ImGui::TableSetupColumn("Progress", 0, 0.15f);
-                    ImGui::TableSetupColumn("Status", 0, 0.15f);
-                    ImGui::TableHeadersRow();
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::TextWrapped("Daily Overall");
-                    ImGui::TableNextColumn();
-                    ImGui::Text("");
-                    ImGui::TableNextColumn();
-                    ImGui::Text((std::to_string(progress.second.meta_progress_current) + "/" + std::to_string(progress.second.meta_progress_complete)).c_str());
-                    ImGui::TableNextColumn();
-                    ImGui::Text(progress.second.meta_reward_claimed ? "Claimed" : "Unclaimed");
-                   
-                    
-                    for (auto objective : progress.second.objectives) {
-                        ImGui::TableNextRow();
-                        ImGui::TableNextColumn();
-                        ImGui::TextWrapped(objective.title.c_str());
-                        ImGui::TableNextColumn();
-                        ImGui::Text(objective.track.c_str());
-                        ImGui::TableNextColumn();
-                        ImGui::Text((std::to_string(objective.progress_current) + "/" + std::to_string(objective.progress_complete)).c_str());
-                        ImGui::TableNextColumn();
-                        ImGui::Text(objective.claimed ? "Claimed" : "Unclaimed");
-                    }
-
-                    if (organizerRepo->wizardsVaultWeekly.count(progress.first)) {
+                if (ImGui::CollapsingHeader(("Progress for account: " + progress.first).c_str())) {
+                    ImGui::SetCursorPosX(30);
+                    if (ImGui::BeginTable(("WizardVaultTable" + progress.first).c_str(), 4, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame)) {
+                        ImGui::TableSetupColumn("Title", 0, 0.6f);
+                        ImGui::TableSetupColumn("Track", 0, 0.05f);
+                        ImGui::TableSetupColumn("Progress", 0, 0.15f);
+                        ImGui::TableSetupColumn("Status", 0, 0.15f);
                         ImGui::TableHeadersRow();
 
-                        gw2::wizardsvault::MetaProgress weeklyProgress = organizerRepo->wizardsVaultWeekly[progress.first];
-
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::TextWrapped("Weekly Overall");
+                        ImGui::TextWrapped("Daily Overall");
                         ImGui::TableNextColumn();
                         ImGui::Text("");
                         ImGui::TableNextColumn();
-                        ImGui::Text((std::to_string(weeklyProgress.meta_progress_current) + "/" + std::to_string(weeklyProgress.meta_progress_complete)).c_str());
+                        ImGui::Text((std::to_string(progress.second.meta_progress_current) + "/" + std::to_string(progress.second.meta_progress_complete)).c_str());
                         ImGui::TableNextColumn();
-                        ImGui::Text(weeklyProgress.meta_reward_claimed ? "Claimed" : "Unclaimed");
+                        ImGui::Text(progress.second.meta_reward_claimed ? "Claimed" : "Unclaimed");
 
-                        for (auto objective : weeklyProgress.objectives) {
+
+                        for (auto objective : progress.second.objectives) {
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
                             ImGui::TextWrapped(objective.title.c_str());
@@ -817,9 +842,37 @@ void renderAPITasks() {
                             ImGui::TableNextColumn();
                             ImGui::Text(objective.claimed ? "Claimed" : "Unclaimed");
                         }
-                    }
 
-                    ImGui::EndTable();
+                        if (organizerRepo->wizardsVaultWeekly.count(progress.first)) {
+                            ImGui::TableHeadersRow();
+
+                            gw2::wizardsvault::MetaProgress weeklyProgress = organizerRepo->wizardsVaultWeekly[progress.first];
+
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn();
+                            ImGui::TextWrapped("Weekly Overall");
+                            ImGui::TableNextColumn();
+                            ImGui::Text("");
+                            ImGui::TableNextColumn();
+                            ImGui::Text((std::to_string(weeklyProgress.meta_progress_current) + "/" + std::to_string(weeklyProgress.meta_progress_complete)).c_str());
+                            ImGui::TableNextColumn();
+                            ImGui::Text(weeklyProgress.meta_reward_claimed ? "Claimed" : "Unclaimed");
+
+                            for (auto objective : weeklyProgress.objectives) {
+                                ImGui::TableNextRow();
+                                ImGui::TableNextColumn();
+                                ImGui::TextWrapped(objective.title.c_str());
+                                ImGui::TableNextColumn();
+                                ImGui::Text(objective.track.c_str());
+                                ImGui::TableNextColumn();
+                                ImGui::Text((std::to_string(objective.progress_current) + "/" + std::to_string(objective.progress_complete)).c_str());
+                                ImGui::TableNextColumn();
+                                ImGui::Text(objective.claimed ? "Claimed" : "Unclaimed");
+                            }
+                        }
+
+                        ImGui::EndTable();
+                    }
                 }
             }
         }
@@ -841,6 +894,7 @@ void renderAPITasks() {
                     }
                     if (ImGui::Checkbox(("Track category " + category.first.name).c_str(), &configurable->accountConfiguration[accountName])) {
                         organizerRepo->save();
+                        APIDefs->Events.RaiseNotification(configurable->item.repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
                     }
                 }
                 ImGui::SetCursorPosX(30);
@@ -1222,13 +1276,13 @@ void renderDoneTasks() {
             ImGui::TableNextColumn(); 
             ImGui::TextWrapped(task->owner.c_str());
             ImGui::TableNextColumn(); 
-            ImGui::Text(format_date_output(task->startDate).c_str());
+            ImGui::Text(DateTime(task->startDate).toStringNiceNewline().c_str());
             ImGui::TableNextColumn(); 
-            ImGui::Text(format_date_output(task->completionDate).c_str());
+            ImGui::Text(DateTime(task->completionDate).toStringNiceNewline().c_str());
             ImGui::TableNextColumn(); 
             if (iconReactivate != nullptr) {
                 ImGui::PushID(hashString("react_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                     task->completed = false;
                     task->completionDate = "";
                     organizerRepo->save();
@@ -1250,7 +1304,7 @@ void renderDoneTasks() {
             ImGui::TableNextColumn(); 
             if (iconTrash != nullptr) {
                 ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                     task->deleted = true;
                     organizerRepo->save();
                 }
@@ -1262,7 +1316,7 @@ void renderDoneTasks() {
                 }
             }
             else {
-                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), { 20,20 })) {
+                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), { 20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
                     task->deleted = true;
                     organizerRepo->save();
                 }
@@ -1275,7 +1329,7 @@ void renderDoneTasks() {
     // - add a drop down "Show last 10, 25, 50"
     // - add pagination
     int currentIndex = doneItemsPerPage == 10 ? 0 : doneItemsPerPage == 25 ? 1 : 2;
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::Combo("Items per page", &currentIndex, itemsPerPageComboItems, IM_ARRAYSIZE(itemsPerPageComboItems))) {
         switch (currentIndex) {
         case 0: doneItemsPerPage = 10; break;
@@ -1296,14 +1350,14 @@ void renderDoneTasks() {
     ImGui::Text(pagesText.c_str());
     // page buttons
     ImGui::SameLine();
-    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 - 25 - 15);
-    if (ImGui::Button("<", {25,25})) {
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 - 25 * NexusLink->Scaling - 15 * NexusLink->Scaling);
+    if (ImGui::Button("<", {25 * NexusLink->Scaling,25 * NexusLink->Scaling })) {
         doneCurrentPage--;
         if (doneCurrentPage == 0) doneCurrentPage = 1;
     }
     ImGui::SameLine();
-    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 + (textWidth) + 15);
-    if (ImGui::Button(">", {25,25})) {
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 + (textWidth) + 15 * NexusLink->Scaling);
+    if (ImGui::Button(">", {25 * NexusLink->Scaling,25 * NexusLink->Scaling })) {
         doneCurrentPage++;
         if (doneCurrentPage > totalPagesAvailable) doneCurrentPage = totalPagesAvailable;
     }
@@ -1427,13 +1481,13 @@ void renderTaskConfiguration() {
                     // Single time task, begin "start task" routine
                     if (iconStart != nullptr) {
                         ImGui::PushID(hashString("start_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconStart->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconStart->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
 
                             renderAddNew = true;
                             newItem = OrganizerItem(*item);
 
                             newInstance = {};
-                            newInstance.startDate = format_date(std::chrono::system_clock::now());
+                            newInstance.startDate = DateTime::nowLocal().toString();
                             newInstance.endDate = "";
                             newInstance.completed = false;
                             newInstance.itemId = item->id;
@@ -1453,7 +1507,7 @@ void renderTaskConfiguration() {
                             newItem = OrganizerItem(*item);
 
                             newInstance = {};
-                            newInstance.startDate = format_date(std::chrono::system_clock::now());
+                            newInstance.startDate = DateTime::nowLocal().toString();
                             newInstance.endDate = "";
                             newInstance.completed = false;
                             newInstance.itemId = item->id;
@@ -1481,7 +1535,7 @@ void renderTaskConfiguration() {
 
                     if (btnTex != nullptr) {
                         ImGui::PushID(hashString("subscribe_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)btnTex->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)btnTex->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                             item->accountConfiguration[accountName] = subscribe;
                             organizerRepo->save();
                             APIDefs->Events.RaiseNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
@@ -1505,7 +1559,7 @@ void renderTaskConfiguration() {
             else {
                 if (iconSave != nullptr) {
                     ImGui::PushID(hashString("save_" + std::to_string(item->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconSave->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconSave->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                         item->title = editItem->title;
                         item->description = editItem->description;
                         item->type = editItem->type;
@@ -1537,7 +1591,7 @@ void renderTaskConfiguration() {
             if (editItem == nullptr || editItem->id != item->id) {
                 if (iconEdit != nullptr) {
                     ImGui::PushID(hashString("edit_" + std::to_string(item->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconEdit->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconEdit->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                         editItem = new OrganizerItem(*item);
                     }
                     ImGui::PopID();
@@ -1556,7 +1610,7 @@ void renderTaskConfiguration() {
             else {
                 if (iconCancel != nullptr) {
                     ImGui::PushID(hashString("cancel_" + std::to_string(item->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconCancel->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconCancel->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                         editItem = nullptr;
                     }
                     ImGui::PopID();
@@ -1576,7 +1630,7 @@ void renderTaskConfiguration() {
             if (editItem == nullptr || editItem->id != item->id) {
                 if (iconTrash != nullptr) {
                     ImGui::PushID(hashString("remove_" + std::to_string(item->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20,20 }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
                         item->deleted = true;
                         organizerRepo->save();
                     }
@@ -1602,7 +1656,7 @@ void renderTaskConfiguration() {
     }
 
     int currentIndex = configItemsPerPage == 10 ? 0 : configItemsPerPage == 25 ? 1 : 2;
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::Combo("Items per page", &currentIndex, itemsPerPageComboItems, IM_ARRAYSIZE(itemsPerPageComboItems))) {
         switch (currentIndex) {
         case 0: configItemsPerPage = 10; break;
@@ -1623,14 +1677,14 @@ void renderTaskConfiguration() {
     ImGui::Text(pagesText.c_str());
     // page buttons
     ImGui::SameLine();
-    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 - 25 - 15);
-    if (ImGui::Button("<", { 25,25 })) {
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 - 25 * NexusLink->Scaling - 15 * NexusLink->Scaling);
+    if (ImGui::Button("<", { 25 * NexusLink->Scaling,25 * NexusLink->Scaling })) {
         configCurrentPage--;
         if (configCurrentPage == 0) configCurrentPage = 1;
     }
     ImGui::SameLine();
-    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 + (textWidth)+15);
-    if (ImGui::Button(">", { 25,25 })) {
+    ImGui::SetCursorPosX((windowWidth - textWidth) / 2 + (textWidth)+15 * NexusLink->Scaling);
+    if (ImGui::Button(">", { 25 * NexusLink->Scaling,25 * NexusLink->Scaling })) {
         configCurrentPage++;
         if (configCurrentPage > totalPagesAvailable) configCurrentPage = totalPagesAvailable;
     }
@@ -1725,7 +1779,7 @@ void renderSettings() {
             ImGui::TableSetColumnIndex(2);
             gw2::token::ApiToken* token = apiTokenService.getToken(it->identifier);
             if (token != nullptr) {
-                if (ImGui::CollapsingHeader("Permissions...")) {
+                if (ImGui::CollapsingHeader(("Permissions...##" + it->identifier).c_str())) {
                     std::stringstream stream;
                     for (auto perm : token->permissions) {
                         stream << perm << std::endl;
@@ -1753,33 +1807,33 @@ void renderSettings() {
     if (ImGui::Checkbox("Enable Notifications", &settings.notifications.enabled)) {
         StoreSettings();
     }
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::InputInt("Notification X minutes before", &settings.notifications.minutesUntilDue)) {
         StoreSettings();
     }
 
     ImGui::Text("Notifications position (X:Y)");
 
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::InputInt("##NotificationPosX", &settings.notifications.x)) {
         StoreSettings();
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::InputInt("##NotificationPosY", &settings.notifications.y)) {
         StoreSettings();
     }
 
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::InputInt("Width", &settings.notifications.width)) {
         StoreSettings();
     }
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     if (ImGui::InputInt("Height", &settings.notifications.height)) {
         StoreSettings();
     }
 
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
     int durationSec = settings.notifications.duration / 1000;
     if (ImGui::InputInt("Duration (sec.)", &durationSec)) {
         settings.notifications.duration = durationSec * 1000;

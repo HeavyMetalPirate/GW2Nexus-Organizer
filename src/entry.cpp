@@ -167,6 +167,12 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->Events.RaiseNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#00ff00>Organizer</c> was loaded.");
+	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, ("Current Date/Time: " + DateTime::nowLocal().toString()).c_str());
+	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, ("Last Daily Reset: " + DateTime::nowLocal().getLastDaily().toString()).c_str());
+	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, ("Next Daily Reset: " + DateTime::nowLocal().getNextDaily().toString()).c_str());
+	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, ("Last Weekly Reset: " + DateTime::nowLocal().getLastWeekly().toString()).c_str());
+	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, ("Next Weekly Reset: " + DateTime::nowLocal().getNextWeekly().toString()).c_str());
+
 }
 
 ///----------------------------------------------------------------------------------------------------
