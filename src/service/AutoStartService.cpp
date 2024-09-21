@@ -114,6 +114,7 @@ void AutoStartService::CheckNotifications() {
 void AutoStartService::PerformDailyReset() {
     APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Daily Reset triggered.");
     CreateTasksForRepeatMode(RepeatMode::DAILY);
+    CreateTasksForRepeatMode(RepeatMode::CUSTOM);
     
 }
 void AutoStartService::PerformWeeklyReset() {
@@ -156,6 +157,22 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         if (!item->accountConfiguration.contains(account)) continue; // no subscription data
         if (!item->accountConfiguration[account]) continue; // not subscribed on that account
 
+        if (mode == RepeatMode::CUSTOM) {
+            // check if today is *the* day
+            if (!item->daysOfWeek.empty()) {
+                // check if week days match
+                int day = DateTime().GetTodayAsDayOfWeek();
+                if (std::count(item->daysOfWeek.begin(), item->daysOfWeek.end(), day) == 0) continue; // Today is *not* the day
+
+            }
+            else if(!item->daysOfMonth.empty()) {
+                // check if day of month matches
+                // TODO special case: ultimo of month
+                int day = DateTime().GetTodayAsDayOfMonth();
+                if (std::count(item->daysOfMonth.begin(), item->daysOfMonth.end(), day) == 0) continue; // Today is *not* the day
+            }
+        }
+
         bool startTask = true;
         // Check all existing instances on whether we may start the task
         for (auto instance : organizerRepo->getTaskInstances()) {
@@ -172,7 +189,9 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             }
 
             // If the instance is not open but completed or deleted, check if the begin date was "since last reset"
-            auto lastReset = mode == RepeatMode::DAILY ? DateTime::nowLocal().getLastDaily() : DateTime::nowLocal().getLastWeekly();
+            auto lastReset = mode == RepeatMode::DAILY || mode == RepeatMode::CUSTOM ? // daily and custom are triggered daily for that day
+                                        DateTime::nowLocal().getLastDaily() : 
+                                        DateTime::nowLocal().getLastWeekly();
             auto startDate = DateTime(instance->startDate);  
             if ((instance->completed || instance->deleted) && startDate > lastReset) {
                 APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Task '" + item->title + "' already started and completed/deleted since relevant reset on account " + account + " - skipping creation.").c_str());
@@ -189,7 +208,16 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         if (startTask) {
             OrganizerItemInstance newInstance = {};
             newInstance.startDate = DateTime::nowLocal().toString();
-            auto nextReset = mode == RepeatMode::DAILY ? DateTime::nowLocal().getNextDaily() : DateTime::nowLocal().getNextWeekly();
+
+            // LOOK MA, NO HANDS DOING SWITCH EXPRESSIONS!
+            auto nextReset = [&]() {
+                switch (mode) {
+                    case RepeatMode::DAILY: return DateTime::nowLocal().getNextDaily();
+                    case RepeatMode::WEEKLY: return DateTime::nowLocal().getNextWeekly();
+                    case RepeatMode::CUSTOM: return DateTime::fromTodayAt(item->dueHours, item->dueMinutes);
+                default: return DateTime::nowLocal();
+                }
+            }();
             newInstance.endDate = nextReset.toString();
             newInstance.completed = false;
             newInstance.itemId = item->id;

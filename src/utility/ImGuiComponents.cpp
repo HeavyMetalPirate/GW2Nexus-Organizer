@@ -214,8 +214,6 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
         }
         valueChanged = true;
     }
-    std::string text = "Zone: ";
-    text.push_back(timezoneSign);
 
     ImGui::EndChild();
 

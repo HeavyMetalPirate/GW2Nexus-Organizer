@@ -58,6 +58,29 @@ public:
         return dt;
     }
 
+    // Create a DateTime representing today at a specific hour and minute (local time)
+    static DateTime fromTodayAt(int hour, int minute) {
+        std::tm tm = {};
+        DateTime result;
+
+        // Get the current local time
+        std::time_t now = std::time(nullptr);
+        localtimeSafe(&tm, &now);
+
+        // Set the hour and minute while keeping the current day
+        tm.tm_hour = hour;
+        tm.tm_min = minute;
+        tm.tm_sec = 0;  // Seconds are set to 0
+
+        // Convert back to time_t (local time)
+        result.timePoint_ = std::mktime(&tm);
+
+        // Set the timezone offset (detected from the system)
+        result.timeZoneOffset_ = detectSystemTimeZoneOffset();
+
+        return result;
+    }
+
     // Thread-safe comparison with the current system time
     bool isBeforeNow() const {
         return timePoint_ < std::time(nullptr);
@@ -247,6 +270,42 @@ public:
         result.timePoint_ = nextMonday;
         result.toLocalTime();  // Convert back to local time
         return result;
+    }
+
+    // Get today as day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+    int GetTodayAsDayOfWeek() const {
+        std::tm tm = {};
+        localtimeSafe(&tm, &timePoint_);
+        return tm.tm_wday;
+    }
+
+    // Get today as day of the month (e.g., 1, 15, 30)
+    int GetTodayAsDayOfMonth() const {
+        std::tm tm = {};
+        localtimeSafe(&tm, &timePoint_);
+        return tm.tm_mday;
+    }
+
+    // Check if today is the last day of the month
+    bool IsTodayUltimoOfMonth() const {
+        std::tm tm = {};
+        localtimeSafe(&tm, &timePoint_);
+
+        // Save the current day of the month
+        int currentDay = tm.tm_mday;
+
+        // Move to the first day of the next month
+        tm.tm_mday = 1;
+        tm.tm_mon += 1;
+
+        // Convert back to time_t to adjust the date
+        std::time_t nextMonth = std::mktime(&tm);
+
+        // Go back one day to get the last day of the current month
+        nextMonth -= 86400;  // 86400 seconds = 1 day
+        localtimeSafe(&tm, &nextMonth);
+
+        return currentDay == tm.tm_mday;
     }
 
 private:

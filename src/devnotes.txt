@@ -33,13 +33,11 @@ Weekly Rifts = 365
 
 
 What is still not working or WIP at best:
-Custom repetition intervals are not working yet 
-I plan on making them configurable in a way that is "every X days, optional start day, optional due time" so you could set up tasks like "Weekly Raid Clear with MyAwesomeGuild every 7 days on Tuesdays at 7p.m."
-single achievement tracking (deactivated that, only category tracking allowed for now until I decide how to proceed with the issues)
-assigning/reassigning tasks to different accounts than the logged in one
-editing due dates
-column minimum width is still not a thing; pretty much all "description" columns will still look botched if the window is too small
-more customization for notifications like border color/styling, growth direction etc. are coming soon ™️
-stats like "tasks completed per day", "tasks abandoned", "tasks completed after due" etc. are on the horizon but not quite there yet
-column sorting on the tables
-recovering deleted tasks/configurations
+- Custom repetition intervals are not working yet 
+--I plan on making them configurable in a way that is "every X days, optional start day, optional due time" so you could set up tasks like "Weekly Raid Clear with MyAwesomeGuild every 7 days on Tuesdays at 7p.m."
+- single achievement tracking (deactivated that, only category tracking allowed for now until I decide how to proceed with the issues)
+- assigning/reassigning tasks to different accounts than the logged in one
+- editing due dates
+- more customization for notifications like border color/styling, growth direction etc. are coming soon ™️
+- stats like "tasks completed per day", "tasks abandoned", "tasks completed after due" etc. are on the horizon but not quite there yet
+- recovering deleted tasks/configurations

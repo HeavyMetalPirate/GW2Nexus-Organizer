@@ -28,7 +28,7 @@
 
 #include "OmegaGlobals.h"
 #include "resource.h"
-//#include "utility/DateTimeUtils.h" /* oh no, deprecation! */
+#include "utility/LoggerWrapper.h"
 #include "utility/DateTime.h"
 #include "utility/StringUtils.h"
 
@@ -44,6 +44,7 @@ extern std::string accountName;
 extern std::string characterName;
 
 extern bool unloading;
+extern bool autotrackActive;
 
 // Structs
 struct EvAgentUpdate				// when ev is null
@@ -109,6 +110,91 @@ inline void StoreSettings() {
 	}
 	else {
 		APIDefs->Log(ELogLevel_WARNING, ADDON_NAME, "Could not store settings.json - configuration might get lost between loads.");
+	}
+}
+
+static const std::string fallbackIdConversion(const std::string& str) {
+	std::vector<std::string> junctionWords = { "of", "and", "the", "in", "on", "at", "for", "with", "by", "to", "as" };
+	std::stringstream ss(str);
+	std::string word, result;
+
+	while (std::getline(ss, word, '_')) {
+		if (!word.empty()) {
+			std::transform(word.begin(), word.end(), word.begin(), ::tolower);
+			if (std::find(junctionWords.begin(), junctionWords.end(), word) == junctionWords.end()) {
+				word[0] = toupper(word[0]);
+			}
+			result += word + " ";
+		}
+	}
+	if (!result.empty()) {
+		result.pop_back();
+	}
+
+	return result;
+}
+static const std::string getCraftableName(std::string id) {
+	try {
+		return dailyCraftablesTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for craftable '" + id + "'.");
+		return fallbackIdConversion(id);
+	}
+}
+static const std::string getMetaName(std::string id) {
+	try {
+		return mapChestsTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for meta '" + id + "'.");
+		return fallbackIdConversion(id);
+	}
+}
+
+static const std::string getWorldBossName(std::string id) {
+	try {
+		return worldbossesTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for world boss '" + id + "'.");
+		return fallbackIdConversion(id);
+	}
+}
+static const std::string getDungeonName(std::string id) {
+	try {
+		return dungeonTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for dungeon '" + id + "'.");
+		return fallbackIdConversion(id);
+	}
+}
+static const std::string getDungeonPathName(std::string id) {
+	try {
+		return dungeonPathsTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for dungeon path '" + id + "'.");
+		return fallbackIdConversion(id);
+	}
+}
+static const std::string getRaidName(std::string id) {
+	try {
+		return raidTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for raid '" + id + "'.");
+		return fallbackIdConversion(id);
+	}
+}
+static const std::string getRaidBossName(std::string id) {
+	try {
+		return raidBossesTranslator.at(id);
+	}
+	catch (...) {
+		Log(ELogLevel_WARNING, ADDON_NAME, "Could not obtain title for raid boss '" + id + "'.");
+		return fallbackIdConversion(id);
 	}
 }
 

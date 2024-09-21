@@ -33,6 +33,10 @@ static const char* daysOfWeek[] = {
 	"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" 
 };
 
+static const char* intervalModeItems[] = { "Day of week", "Day of month" };
+static const char* daysOfWeekItems[] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+static const int daysOfMonthCount = 31;
+
 // String mappers
 static const std::map<std::string, std::string> dailyCraftablesTranslator = {
 	{"charged_quartz_crystal", "Charged Quartz Crystal"},
@@ -49,7 +53,18 @@ static const std::map<std::string, std::string> mapChestsTranslator = {
 	{"elon_riverlands_heros_choice_chest","Elon Riverlands Hero's Choice Chest"},
 	{"tangled_depths_heros_choice_chest","Tangled Depths Hero's Choice Chest"},
 	{"the_desolation_heros_choice_chest","The Desolation Hero's Choice Chest"},
-	{"verdant_brink_heros_choice_chest","Verdant Brink Hero's Choice Chest"}
+	{"verdant_brink_heros_choice_chest","Verdant Brink Hero's Choice Chest"},
+	{"amnytas_heros_choice_chest","Amnytas Hero's Choice Chest"},
+	{"citadel_of_zakiros_heros_choice_chest","Citadel of Zakiros Hero's Choice Chest"},
+	{"convergence_heros_choice_chest","Convergence Hero's Choice Chest"},
+	{"dragons_end_heros_choice_chest","Dragons End Hero's Choice Chest"},
+	{"echovald_wilds_heros_choice_chest","Echovald Wilds Hero's Choice Chest"},
+	{"gyala_delve_heros_choice_chest","Gyala Delve Hero's Choice Chest"},
+	{"inner_nayos_heros_choice_chest","Inner Nayos Hero's Choice Chest"},
+	{"new_kaineng_city_heros_choice_chest","New Kaineng City Hero's Choice Chest"},
+	{"seitung_province_heros_choice_chest","Seitung Province Hero's Choice Chest"},
+	{"skywatch_archipelago_heros_choice_chest","Skywatch Archipelago Hero's Choice Chest"},
+	{"wild_island_heros_choice_chest","Wild Island Hero's Choice Chest"}
 };
 static const std::map<std::string, std::string> worldbossesTranslator = {
 	{"admiral_taidha_covington", "Admiral Taidha Covington"},
@@ -65,7 +80,8 @@ static const std::map<std::string, std::string> worldbossesTranslator = {
 	{"svanir_shaman_chief","Svanir Shaman Chief"},
 	{"tequatl_the_sunless","Tequatl the Sunless"},
 	{"the_shatterer","The Shatterer"},
-	{"triple_trouble_wurm","Triple Trouble"}
+	{"triple_trouble_wurm","Triple Trouble"},
+	{"mists_and_monsters_titans", "Of Mists and Monsters - Titans"}
 };
 static const std::map<std::string, std::string> dungeonTranslator = {
 	{"ascalonian_catacombs", "Ascalonian Catacombs"},

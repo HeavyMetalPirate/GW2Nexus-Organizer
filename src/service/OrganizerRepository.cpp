@@ -13,8 +13,10 @@ void CheckAccountProgressTasks(OrganizerRepository* repo, std::string accountNam
 std::map<std::string, std::vector<std::string>> raidEncounters = {};
 std::map<std::string, std::vector<std::string>> dungeonPaths = {};
 
+bool autotrackActive = false;
+
 bool OrganizerRepository::firstInitializeDone() {
-	if (!accountProgressInitialized) return false;
+	// if (!accountProgressInitialized) return false; // temporary disabled because this halts the creation of auto tasks forever
 	if (dungeons.empty()) return false;
 	if (raids.empty()) return false;
 	if (mapchests.chests.empty()) return false;
@@ -312,7 +314,7 @@ void InitializeDailyCrafting(OrganizerRepository* repo) {
 			configurable->originalId = recipe;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = recipe;
-			item.title = dailyCraftablesTranslator.at(recipe);
+			item.title = getCraftableName(recipe);
 			item.description = "Daily craftable crafted: " + item.title;
 			item.type = ItemType::DAILY_CRAFTING;
 			item.repeatMode = RepeatMode::DAILY;
@@ -344,7 +346,7 @@ void InitializeWorldbosses(OrganizerRepository* repo) {
 			configurable->originalId = worldboss;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = worldboss;
-			item.title = worldbossesTranslator.at(worldboss);
+			item.title = getWorldBossName(worldboss);
 			item.description = "World Boss slain: " + item.title;
 			item.type = ItemType::DAILY_WORLD_BOSS;
 			item.repeatMode = RepeatMode::DAILY;
@@ -376,7 +378,7 @@ void InitializeMapchests(OrganizerRepository* repo) {
 			configurable->originalId = meta;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = meta;
-			item.title = mapChestsTranslator.at(meta);
+			item.title = getMetaName(meta);
 			item.description = "Map Meta completed: " + item.title;
 			item.type = ItemType::DAILY_MAP_CHEST;
 			item.repeatMode = RepeatMode::DAILY;
@@ -408,7 +410,7 @@ void InitializeDungeons(OrganizerRepository* repo) {
 			configurable->originalId = dungeon.id;
 			OrganizerItem item = OrganizerItem();
 			item.apiId = dungeon.id;
-			item.title = dungeonTranslator.at(dungeon.id);
+			item.title = getDungeonName(dungeon.id);
 			item.description = "Full dungeon completed: " + item.title;
 			item.type = ItemType::DAILY_DUNGEON_FULL;
 			item.repeatMode = RepeatMode::DAILY;
@@ -421,7 +423,7 @@ void InitializeDungeons(OrganizerRepository* repo) {
 				configurable->originalId = path.id;
 				OrganizerItem item = OrganizerItem();
 				item.apiId = path.id;
-				item.title = dungeonPathsTranslator.at(path.id);
+				item.title = getDungeonPathName(path.id);
 				item.description = "Dungeon Path completed: " + item.title;
 				item.type = ItemType::DAILY_DUNGEON_PATH;
 				item.repeatMode = RepeatMode::DAILY;
@@ -459,7 +461,7 @@ void InitializeRaids(OrganizerRepository* repo) {
 				configurable->originalId = wing.id;
 				OrganizerItem item = OrganizerItem();
 				item.apiId = wing.id;
-				item.title = raidTranslator.at(wing.id);
+				item.title = getRaidName(wing.id);
 				item.description = "Raid Wing completed: " + item.title;
 				item.type = ItemType::WEEKLY_RAID_FULL;
 				item.repeatMode = RepeatMode::WEEKLY;
@@ -473,7 +475,7 @@ void InitializeRaids(OrganizerRepository* repo) {
 					configurable->originalId = encounter.id;
 					OrganizerItem item = OrganizerItem();
 					item.apiId = encounter.id;
-					item.title = raidBossesTranslator.at(encounter.id);
+					item.title = getRaidBossName(encounter.id);
 					item.description = "Raid Encounter completed: " + item.title;
 					item.type = ItemType::WEEKLY_RAID_ENCOUNTER;
 					item.repeatMode = RepeatMode::WEEKLY;
@@ -579,6 +581,24 @@ void InitializeAchievements(OrganizerRepository* repo) {
 }
 void LoadAccountProgress(OrganizerRepository* repo) {
 	repo->accountProgressInitialized = false;
+
+	/* Pre-Start Delay to let GW2 API update */
+	/* Apparently it is necessary to let the GW2 API reset after game login.
+	   Tracking my ominous caching issues I found out that the /account/** endpoints do not reset at server reset but rather will be reset with
+	   the next client login. Until this reset is reflected in the API however it takes a while. Bit of testing showed 5+ minutes quite possible,
+	   and I wouldn't bet that it won't go beyond that even.
+
+	   So the backup plan really is: let the thread sleep for 10ish minutes on start up, then kick it off with a huzzaaaah!
+	 */
+	autotrackActive = false;
+	APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Delaying API calls to Account data...");
+	for (auto i = 0; i < (300000); i++) {
+		Sleep(1);
+		if (unloading) break;
+	}
+	autotrackActive = true;
+	APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Auto Tracking initialized.");
+
 	while (!unloading) {
 		for (auto key : settings.apiKeys) {
 			if (unloading) break;
@@ -640,7 +660,7 @@ void LoadAccountProgress(OrganizerRepository* repo) {
 		repo->accountProgressInitialized = true;
 
 		if (unloading) break;
-		for (auto i = 0; i < 15000; i++) {
+		for (auto i = 0; i < 60000; i++) {
 			Sleep(1);
 			if (unloading) break;
 		}

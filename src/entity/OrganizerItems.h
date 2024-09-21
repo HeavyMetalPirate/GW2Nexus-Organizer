@@ -93,13 +93,19 @@ struct OrganizerItem {
 
 	ItemType type;
 	RepeatMode repeatMode;
-	int customRepeatInterval;
+
+	//Custom Repeat Mode
+	int intervalMode;
+	std::vector<int> daysOfWeek;
+	std::vector<int> daysOfMonth;
+	int dueHours;
+	int dueMinutes;
 
 	std::map<std::string, bool> accountConfiguration;
 
 	bool deleted;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItem, id, apiId, title, description, type, repeatMode, customRepeatInterval, accountConfiguration, deleted);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItem, id, apiId, title, description, type, repeatMode, intervalMode, daysOfWeek, daysOfMonth, dueHours, dueMinutes, accountConfiguration, deleted);
 
 struct OrganizerItemInstance {
 	int id;

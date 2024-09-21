@@ -201,6 +201,7 @@
     <ClInclude Include="utility\DateTime.h" />
     <ClInclude Include="utility\DateTimeUtils.h" />
     <ClInclude Include="utility\ImGuiComponents.h" />
+    <ClInclude Include="utility\LoggerWrapper.h" />
     <ClInclude Include="utility\StringUtils.h" />
   </ItemGroup>
   <ItemGroup>

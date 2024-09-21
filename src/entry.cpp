@@ -82,8 +82,8 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 1;
-	AddonDef.Version.Build = 2;
+	AddonDef.Version.Minor = 2;
+	AddonDef.Version.Build = 0;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
