@@ -154,8 +154,8 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
 #endif
         if (item->deleted) continue; // task does not technically exist anymore
         if (item->repeatMode != mode) continue; // not the correct mode
-        if (!item->accountConfiguration.contains(account)) continue; // no subscription data
-        if (!item->accountConfiguration[account]) continue; // not subscribed on that account
+        if (account != "Everyone" && !item->accountConfiguration.contains(account)) continue; // no subscription data
+        if (account != "Everyone" && !item->accountConfiguration[account]) continue; // not subscribed on that account
 
         if (mode == RepeatMode::CUSTOM) {
             // check if today is *the* day

@@ -16,7 +16,7 @@ std::map<std::string, std::vector<std::string>> dungeonPaths = {};
 bool autotrackActive = false;
 
 bool OrganizerRepository::firstInitializeDone() {
-	// if (!accountProgressInitialized) return false; // temporary disabled because this halts the creation of auto tasks forever
+	if (!accountProgressInitialized) return false;
 	if (dungeons.empty()) return false;
 	if (raids.empty()) return false;
 	if (mapchests.chests.empty()) return false;
@@ -581,6 +581,24 @@ void InitializeAchievements(OrganizerRepository* repo) {
 }
 void LoadAccountProgress(OrganizerRepository* repo) {
 	repo->accountProgressInitialized = false;
+	// Preload all configured keys to activate account repository
+	for (auto key : settings.apiKeys) {
+		if (unloading) break;
+		try {
+			gw2::account::Account account = LoadAccountData(key.apiKey);
+			if (account.name.empty()) continue;
+			repo->accounts.emplace(account.name, account);
+		}
+		catch (const std::exception& e) {
+			APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, ("OrganizerRepository::LoadAccountProgress() during Preload: " + std::string(e.what())).c_str());
+		}
+		catch (...) {
+			APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Could not load Account progression data during preload. Certain functionality might not be fully available.");
+		}
+	}
+
+	// At this point, all configured keys have run through first time so set flag
+	repo->accountProgressInitialized = true;
 
 	/* Pre-Start Delay to let GW2 API update */
 	/* Apparently it is necessary to let the GW2 API reset after game login.
@@ -656,8 +674,6 @@ void LoadAccountProgress(OrganizerRepository* repo) {
 			}
 
 		}
-		// At this point, all configured keys have run through first time so set flag
-		repo->accountProgressInitialized = true;
 
 		if (unloading) break;
 		for (auto i = 0; i < 60000; i++) {

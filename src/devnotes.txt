@@ -33,8 +33,6 @@ Weekly Rifts = 365
 
 
 What is still not working or WIP at best:
-- Custom repetition intervals are not working yet 
---I plan on making them configurable in a way that is "every X days, optional start day, optional due time" so you could set up tasks like "Weekly Raid Clear with MyAwesomeGuild every 7 days on Tuesdays at 7p.m."
 - single achievement tracking (deactivated that, only category tracking allowed for now until I decide how to proceed with the issues)
 - assigning/reassigning tasks to different accounts than the logged in one
 - editing due dates
