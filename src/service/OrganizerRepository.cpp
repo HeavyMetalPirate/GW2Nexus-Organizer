@@ -185,6 +185,102 @@ void OrganizerRepository::save() {
 	}
 }
 
+void OrganizerRepository::performCleanup() {
+	// plan: in a thread (so we can be as shitty performing as we want to really because vectors are stupid), do:
+	// - check each task instance
+	//  - if done: check completion date
+	//  - if deleted: check creation date
+	// - if date difference > settings.retetionthingy, remove from vector
+	// - after all instances are done, check all configurations
+	//   - check if it still has instances left
+	//   - if no instances, delete the category if repeatmode = none
+	//   - extra with no solution for now: repeatables without subscribers? users may wanna pause these for a while and keep the configuration around still/
+	// - save at the end
+	
+
+	std::thread([&] {
+		if (settings.retentionPeriod <= 0) return; // 0 = no cleanup configured, and negatives for sanity as well
+		auto retentionDate = DateTime::nowLocal().subtractDays(settings.retentionPeriod);
+
+		this->taskInstances.erase(
+			std::remove_if(this->taskInstances.begin(), this->taskInstances.end(), [&](OrganizerItemInstance* instance) {
+				if (!instance->completed && !instance->deleted) return false; // still active
+				try {
+					auto referenceDate = instance->completed ? DateTime(instance->completionDate) : DateTime(instance->startDate);
+
+#ifndef NDEBUG
+					APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, ("Checking for instance " + std::to_string(instance->id) + " of type " + std::to_string(instance->itemId)).c_str());
+					APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, ("Retention Date: " + retentionDate.toStringNice()).c_str());
+					APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, ("Reference Date: " + referenceDate.toStringNice()).c_str());
+#endif // !_NDEBUG
+
+
+					if (retentionDate > referenceDate) {
+#ifndef NDEBUG
+						APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Instance should be deleted!");
+#endif
+						return true; // delete please
+					}
+				}
+				catch (const std::exception& e) {
+					APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, e.what());
+				}
+				catch (...) {
+					APIDefs->Log(ELogLevel_CRITICAL, ADDON_NAME, "Unknown exception while calling OrganizerRepository::performCleanup()!");
+				}
+				return false;
+			}), this->taskInstances.end()
+		);
+
+		if (settings.deleteEmptyConfigs) {
+
+			// delete empty configurations
+			this->configurableItems.erase(
+				std::remove_if(this->configurableItems.begin(), this->configurableItems.end(), [&](OrganizerItem* item) {
+
+#ifndef NDEBUG
+					APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, ("Checking ConfigItem with id " + std::to_string(item->id)).c_str());
+#endif // !NDEBUG
+					if (item->id < organizerItemStartId) return false; // keep the pre defined item ids
+
+					// if still existing instances, no delete please
+					if (std::any_of(this->taskInstances.begin(), this->taskInstances.end(), [&](const OrganizerItemInstance* instance) {return item->id == instance->itemId;})) {
+#ifndef NDEBUG
+						APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Not deleting because instances still available!");
+#endif // !NDEBUG
+						return false;
+					}
+			
+					// subscription based, delete if no existing instances and no subscribers left
+					if (item->repeatMode != RepeatMode::ONCE && settings.deleteUnsubscribedConfigs) {
+#ifndef NDEBUG
+						APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Subscribers left? " + item->accountConfiguration.empty() ? "No" : "Yes");
+#endif // !NDEBUG
+						return item->accountConfiguration.empty();
+					}
+					// single execution based, delete if no existing instances
+					else if(item->repeatMode == RepeatMode::ONCE) {
+#ifndef NDEBUG
+						APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Deleting because RepeatMode = ONCE and no tasks left!");
+#endif // !NDEBUG
+						return true;
+					}
+#ifndef NDEBUG
+					APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Not deleting because other conditions not met!");
+#endif // !NDEBUG
+					return false;
+
+				}), this->configurableItems.end()
+			);
+
+		
+		}
+
+		// store changes
+		save();
+	}).detach();
+}
+
 OrganizerItem* OrganizerRepository::getConfigurableItemById(int id) {
 	for (auto item : configurableItems) {
 		if (item->id == id) return item;

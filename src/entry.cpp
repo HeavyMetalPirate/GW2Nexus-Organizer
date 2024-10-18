@@ -82,9 +82,9 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 2;
+	AddonDef.Version.Minor = 3;
 	AddonDef.Version.Build = 0;
-	AddonDef.Version.Revision = 1;
+	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
 	AddonDef.Load = AddonLoad;
@@ -119,6 +119,7 @@ void AddonLoad(AddonAPI* aApi)
 
 	organizerRepo = new OrganizerRepository();
 	organizerRepo->initialize();
+	organizerRepo->performCleanup();
 
 	renderer = Renderer();
 	apiTokenService = ApiTokenService();
@@ -144,6 +145,7 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_NO_REPEAT", IDB_ICON_NO_REPEAT, hSelf, nullptr);
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SAVE", IDB_ICON_SAVE, hSelf, nullptr);
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_CANCEL", IDB_ICON_CANCEL, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SUBSCRIBE", IDB_ICON_SUBSCRIBE, hSelf, nullptr);
 
 	APIDefs->InputBinds.RegisterWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
 	APIDefs->QuickAccess.Add("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
@@ -288,4 +290,34 @@ void HandleTriggerDailyReset(void* eventArgs) {
 }
 void HandleTriggerWeeklyReset(void* eventArgs) {
 	autoStartService.PerformWeeklyReset();
+}
+
+/* ImGui Explorer Functions */
+typedef struct {
+	float delta_time;
+	float screen_width;
+	float screen_height;
+} Env;
+
+// Initial setup (does not get called again on reload)
+extern "C" __declspec(dllexport) void plug_init(ImGuiContext* ctx) {
+
+}
+// Called before reloading the library
+// used to return a state object that will be passed to plug_post_reload
+// and to clean up any additional resources you might have created
+extern "C" __declspec(dllexport) void* plug_pre_reload(void) {
+	return nullptr;
+}
+// gets called after reloading the library with the state object returned by plug_pre_reload
+extern "C" __declspec(dllexport) void plug_post_reload(void* state) {
+	
+}
+// Called every frame
+extern "C" __declspec(dllexport) void plug_update(Env env) {
+
+}
+// unused, but might be used to reset your state
+extern "C" __declspec(dllexport) void plug_reset(void) {
+
 }

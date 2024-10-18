@@ -18,7 +18,7 @@ void NotificationService::render() {
 
 	// Window Border
 	style.WindowBorderSize = 2.0f;  // Adjust border size as needed
-	style.Colors[ImGuiCol_Border] = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+	style.Colors[ImGuiCol_Border] = ImVec4(0.33f, 0.33f, 0.33f, 1.0f);
 
 	// Start position etc.
 	const float windowHeight = settings.notifications.height > 0.0f ? settings.notifications.height : 50.0f;

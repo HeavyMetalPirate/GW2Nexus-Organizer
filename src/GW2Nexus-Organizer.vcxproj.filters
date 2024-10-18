@@ -66,6 +66,9 @@
     <ClInclude Include="OmegaGlobals.h" />
     <ClInclude Include="utility\DateTime.h" />
     <ClInclude Include="utility\LoggerWrapper.h" />
+    <ClInclude Include="explorer\plug.h" />
+    <ClInclude Include="explorer\env.h" />
+    <ClInclude Include="explorer\dlwrapper.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">
@@ -92,6 +95,7 @@
     <Image Include="resources\BtnNoRepetition.png" />
     <Image Include="resources\BtnCancel.png" />
     <Image Include="resources\BtnSave.png" />
+    <Image Include="resources\BtnSubscribe.png" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="devnotes.txt" />

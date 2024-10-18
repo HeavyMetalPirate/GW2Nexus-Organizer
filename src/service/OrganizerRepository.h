@@ -28,6 +28,8 @@ public:
 	/// </summary>
 	void save();
 
+	void performCleanup();
+
 	std::vector<OrganizerItem*> getConfigurableItems() {
 		return this->configurableItems;
 	}
@@ -162,7 +164,7 @@ private:
 	bool ascendingSort;
 
 	int nextApiTaskConfigurableId = 0;
-	int nextConfigurableItemId = 10000; // start high so we have some reserved ones
+	int nextConfigurableItemId = organizerItemStartId; // start high so we have some reserved ones
 	int nextTaskInstanceId = -1;
 	int getNextConfiguratbleItemId();
 	int getNextTaskInstanceId();

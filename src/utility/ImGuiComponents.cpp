@@ -8,48 +8,204 @@
 
 #include "../Constants.h"
 
-void BarChart(const char* label, std::map<std::string, int> values)
+// Function to dynamically generate Y-axis labels
+std::vector<int> generateYAxisLabels(int max_count) {
+    if (max_count <= 0) {
+        return { 0 };  // Avoid invalid cases, return a label of 0
+    }
+
+    // Calculate the magnitude order of the max count
+    int magnitude = std::pow(10, std::floor(std::log10(max_count)));
+
+    // Find an appropriate step size (1, 2, or 5 times the magnitude)
+    int step;
+    if (max_count / magnitude <= 2) {
+        step = magnitude / 2;
+    }
+    else if (max_count / magnitude <= 5) {
+        step = magnitude;
+    }
+    else {
+        step = magnitude * 2;
+    }
+
+    // Ensure step is always at least 1 to avoid division issues
+    if (step == 0) {
+        step = 1;
+    }
+
+    // Generate Y-axis labels
+    std::vector<int> labels;
+    for (int i = 0; i <= max_count + step; i += step) {
+        labels.push_back(i);
+    }
+
+    return labels;
+}
+
+// Function to calculate the height of bars based on max value
+float calculateBarHeight(int count, int max_count, int graph_height) {
+    // Generate Y-axis labels and find the maximum label (not the raw max_count)
+    std::vector<int> labels = generateYAxisLabels(max_count);
+    int max_label = labels.back();  // Get the highest Y-axis label
+
+    if (max_label == 0) {
+        return 0.0;  // Avoid division by zero
+    }
+
+    // Calculate the bar height based on the highest Y-axis label
+    return (static_cast<float>(count) / max_label) * graph_height;
+}
+
+void BarChart(const char* label, std::map<std::string, int> values, float nexusScaling, ChartType chartType)
 {
-    // Sample call:
-    //  const char* dates[] = { "2023-07-01", "2023-07-02", "2023-07-03", "2023-07-04" };
-    //  int tasks[] = { 5, 3, 8, 2 };
-    //  int num_dates = sizeof(tasks) / sizeof(tasks[0]);
-    //  BarChart(dates, tasks, num_dates);
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
 
-    ImGui::Begin(label);
+    ImGui::BeginChild(label, {ImGui::GetWindowSize().x, ImGui::GetWindowSize().y / 3}, false, ImGuiWindowFlags_NoScrollbar);
+    
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    const float margin = 30 * nexusScaling;
+    const float graphHeight = cursorPos.y + (windowSize.y - margin);
+    const float graphWidth = cursorPos.x + (windowSize.x - margin);
 
-    // Get the maximum value for the Y-axis
-    int max_tasks = 0;
-    for(auto value: values) {
-        if (value.second > max_tasks) {
-            max_tasks = value.second;
+    ImGui::Text(label);
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    // Draw Outlines for Chart
+    draw_list->AddLine(
+        ImVec2(cursorPos.x + margin, graphHeight),
+        ImVec2(graphWidth, graphHeight),
+        IM_COL32(255, 0, 255, 255),
+        1.5f * nexusScaling
+    );
+    draw_list->AddLine(
+        ImVec2(cursorPos.x + margin, cursorPos.y + margin),
+        ImVec2(cursorPos.x + margin, graphHeight),
+        IM_COL32(255, 0, 255, 255),
+        1.5f * nexusScaling
+    );
+
+    // Bar stuff
+    int maxValue = 0;
+    for (auto entry : values) {
+        if (entry.second > maxValue) maxValue = entry.second;
+    }
+    std::vector<int> yLabels = generateYAxisLabels(maxValue);
+
+    int yAxisLength = (graphHeight)-(cursorPos.y + margin);
+    float yAxisSpacing = yLabels.size() > 1 ? static_cast<float>(yAxisLength) / (yLabels.size() - 1) : 0;
+    const ImVec2 yAxisLabelSize = ImGui::CalcTextSize("100");
+    const float labelX = cursorPos.x + margin - (yAxisLabelSize.x * nexusScaling);
+
+    for (int i = yLabels.size() - 1; i >= 0; i--) {
+        float labelY = cursorPos.y + margin + (yAxisLength - (i * yAxisSpacing)) - (yAxisLabelSize.y * nexusScaling) / 2;
+
+        draw_list->AddText(
+            ImVec2(labelX, labelY),
+            IM_COL32(255, 255, 255, 255),
+            std::to_string(yLabels[i]).c_str()
+        );
+    }
+
+    int xAxisLength = graphWidth - (cursorPos.x + margin);
+    float xAxisSpacing = values.empty() ? 0 : xAxisLength / values.size();
+    float textWidth = ImGui::CalcTextSize("2023-07-01").x * nexusScaling;
+
+    bool shorten = false;
+    bool shortenExtreme = false;
+    if (textWidth > xAxisSpacing) {
+        shorten = true;
+        textWidth = ImGui::CalcTextSize("23-07-01").x * nexusScaling;
+        if (textWidth > xAxisSpacing) {
+            shortenExtreme = true;
+            textWidth = ImGui::CalcTextSize("07-01").x * nexusScaling;
         }
     }
 
-    // Draw the bars
+
     int i = 0;
-    for (auto label: values) {
-        float bar_width = ImGui::CalcTextSize(label.first.c_str()).x;
+    float previousHeight = 0;
+    float previousX = cursorPos.x + margin;
 
-        if (label.second > 0) {
-            float bar_height = (float)label.second / max_tasks;
+    for (auto entry : values) {
+        // x axis drawing
 
-            ImGui::SetCursorPosX(i * bar_width + 5 * i);
-            ImGui::SetCursorPosY(150.0f - bar_height * 100);
-            // TODO maybe a more cool routine for bar drawing intead of a button lmao
-            ImGui::Button("", ImVec2(bar_width, bar_height * 100));
+        std::string text;
+        if (shortenExtreme) {
+            text = entry.first.substr(5);
+        }
+        else if (shorten) {
+            text = entry.first.substr(2);
+        }
+        else {
+            text = entry.first;
         }
 
-        // Label the bar with the date
-        ImGui::SetCursorPosX(i * bar_width + 5 * i);
-        ImGui::SetCursorPosY(150.0f);
-        ImGui::Text(label.first.c_str());
+        draw_list->AddText(
+            ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i)), graphHeight + (5 * nexusScaling)),
+            IM_COL32(255, 255, 255, 255),
+            text.c_str()
+        );
+
+        float height = calculateBarHeight(entry.second, maxValue, yAxisLength);
+        if (chartType == ChartType::LINE_CHART) {
+
+            const float dotSize = 4.0f;
+            ImVec2 topLeft = ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2) - (dotSize / 2), graphHeight - height - dotSize);
+            ImVec2 bottomRight = ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2) + (dotSize / 2), graphHeight - height + dotSize);
+
+            if (ImGui::IsMouseHoveringRect(topLeft, bottomRight)) {
+                ImGui::BeginTooltip();
+                ImGui::Text((entry.first.substr(0, 10) + ": ").c_str());
+                ImGui::SameLine();
+                ImGui::Text(std::to_string(entry.second).c_str());
+                ImGui::EndTooltip();
+            }
+
+            // Draw the dot
+            draw_list->AddCircleFilled(
+                ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2), graphHeight - height),
+                dotSize,
+                IM_COL32(0, 0, 255, 255)
+            );
+            // Draw the line between
+            draw_list->AddLine(
+                ImVec2(previousX, graphHeight - previousHeight),
+                ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2), graphHeight - height),
+                IM_COL32(255, 255, 255, 255),
+                1.5f * nexusScaling
+            );
+        }
+        else if (chartType == ChartType::BAR_CHART) {
+            const float bar_width = textWidth * 0.7;
+
+            ImVec2 topLeft = ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2) - (bar_width / 2), graphHeight - height);
+            ImVec2 bottomRight = ImVec2((cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2) + (bar_width / 2), graphHeight);
+
+            if (ImGui::IsMouseHoveringRect(topLeft, bottomRight)) {
+                ImGui::BeginTooltip();
+                ImGui::Text((entry.first.substr(0, 10) + ": ").c_str());
+                ImGui::SameLine();
+                ImGui::Text(std::to_string(entry.second).c_str());
+                ImGui::EndTooltip();
+            }
+
+            draw_list->AddRectFilled(
+                topLeft,
+                bottomRight,
+                IM_COL32(255, 255, 255, 255)
+            );
+        }
+
+        previousHeight = height;
+        previousX = (cursorPos.x + (margin * 1.5) + (xAxisSpacing * i) + textWidth / 2);
         ++i;
     }
 
-    ImGui::End();
-}
+    ImGui::SetCursorPosY(graphHeight);
 
+    ImGui::EndChild();
+}
 
 bool CardTab(const char* label, bool selected)
 {
@@ -60,7 +216,7 @@ bool CardTab(const char* label, bool selected)
     return pressed;
 }
 
-bool DateTimePicker(const char* label, std::string& dateTimeStr) {
+bool DateTimePicker(const char* label, std::string& dateTimeStr, bool showTime) {
     bool valueChanged = false;
 
     int year, month, day, hour, minute, second, timezoneOffsetHour, timezoneOffsetMinute;
@@ -190,29 +346,31 @@ bool DateTimePicker(const char* label, std::string& dateTimeStr) {
     }
     ImGui::EndChild();
 
-    ImGui::Text("Time (24H):");
-    ImGui::SetNextItemWidth(100.0f);
-    if (ImGui::InputInt("##DatePickerHour", &hour)) {
-        if (hour < 0) hour = 0;
-        if (hour > 23) hour = 23;
-        valueChanged = true;
-    }
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100.0f);
-    if (ImGui::InputInt("##DatePickerMinute", &minute)) {
-        if (minute < 0) {
-            minute = 59;
-            --hour;
+    if (showTime) {
+        ImGui::Text("Time (24H):");
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::InputInt("##DatePickerHour", &hour)) {
             if (hour < 0) hour = 0;
+            if (hour > 23) hour = 23;
+            valueChanged = true;
         }
-        if (minute > 59) {
-            minute = 0;
-            ++hour;
-            if (hour > 23) {
-                hour = 0;
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::InputInt("##DatePickerMinute", &minute)) {
+            if (minute < 0) {
+                minute = 59;
+                --hour;
+                if (hour < 0) hour = 0;
             }
+            if (minute > 59) {
+                minute = 0;
+                ++hour;
+                if (hour > 23) {
+                    hour = 0;
+                }
+            }
+            valueChanged = true;
         }
-        valueChanged = true;
     }
 
     ImGui::EndChild();

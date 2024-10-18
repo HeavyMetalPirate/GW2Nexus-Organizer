@@ -9,6 +9,7 @@ void renderCurrentTasks();
 void renderDoneTasks();
 void renderTaskConfiguration();
 void renderAPITasks();
+void renderStatistics();
 void renderSettings();
 /* Misc rendering proto */
 void renderNewTaskDialog();
@@ -44,6 +45,15 @@ const ImVec4 colorRed = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 const ImVec4 colorGreen = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
 const ImVec4 colorGrey = ImVec4(0.37f, 0.37f, 0.37f, 0.7f);
 
+const static int tab_active = 0;
+const static int tab_ingame_activities = 1;
+const static int tab_done = 2;
+const static int tab_task_settings = 3;
+const static int tab_statistics = 4;
+const static int tab_organizer_settings = 5;
+
+ImVec2 imageButtonSize;
+
 /* Icon resources */
 Texture* iconClose = nullptr;
 Texture* iconOptions = nullptr;
@@ -57,6 +67,7 @@ Texture* iconStart = nullptr;
 Texture* iconEdit = nullptr;
 Texture* iconSave = nullptr;
 Texture* iconCancel = nullptr;
+Texture* iconSubscribe = nullptr;
 
 /* Pagination */
 static const char* itemsPerPageComboItems[] = { "10", "25", "50" };
@@ -65,7 +76,18 @@ int doneCurrentPage = 1;
 int configItemsPerPage = 10;
 int configCurrentPage = 1;
 
+/* Statistics control flags */
+auto statisticsStart = DateTime::fromTodayAt(0, 0).subtractDays(7);
+bool renderStatisticsStartPicker = false;
+auto statisticsEnd = DateTime::fromTodayAt(0, 0);
+bool renderStatisticsEndPicker = false;
+ChartType statisticsChartType = ChartType::BAR_CHART;
+std::map<int, bool> statisticsFilter = std::map<int, bool>();
+
 void Renderer::preRender() {
+    // Set button size for image buttons
+    imageButtonSize = ImVec2(28 * NexusLink->Scaling, 28 * NexusLink->Scaling);
+
     if (iconClose == nullptr)
         iconClose = APIDefs->Textures.Get("ICON_ORGANIZER_CLOSE");
     if (iconOptions == nullptr)
@@ -90,10 +112,25 @@ void Renderer::preRender() {
         iconSave = APIDefs->Textures.Get("ICON_ORGANIZER_SAVE");
     if (iconCancel == nullptr)
         iconCancel = APIDefs->Textures.Get("ICON_ORGANIZER_CANCEL");
+    if (iconSubscribe == nullptr)
+        iconSubscribe = APIDefs->Textures.Get("ICON_ORGANIZER_SUBSCRIBE");
+
 
     if (accountName.empty()) displayOwnOnly = false;
 }
 void Renderer::render() {
+    ImGuiStyle& style = ImGui::GetStyle();
+
+    ImVec2 oldPadding = style.FramePadding;
+    //ImVec2 oldSpacing = style.ItemSpacing;
+    //ImVec2 oldInnerSpacing = style.ItemInnerSpacing;
+    float oldBorderSize = style.FrameBorderSize;
+
+    style.FramePadding = ImVec2(0, 0);  
+    //style.ItemSpacing = ImVec2(0, 0);   
+    //style.ItemInnerSpacing = ImVec2(0, 0);
+    style.FrameBorderSize = 0.0f;
+
     try {
         renderNewTaskDialog();
     }
@@ -121,6 +158,11 @@ void Renderer::render() {
     catch (...) {
         Log(ELogLevel_CRITICAL, ADDON_NAME, "Unknown exception while calling AddonRenderer::Render():RenderOrganizer()");
     }
+
+    style.FramePadding = oldPadding;
+    //style.ItemSpacing = oldSpacing;
+    //style.ItemInnerSpacing = oldInnerSpacing;
+    style.FrameBorderSize = oldBorderSize;
 }
 void Renderer::postRender() {
 	// TODO impl
@@ -235,7 +277,7 @@ void renderTodoList() {
         ImGui::PopFont();
         ImGui::SameLine(ImGui::GetWindowWidth() - (3 * (32 * NexusLink->Scaling) + 5)); // 3* buttons plus 5 generic to the edge
         if (iconAdd != nullptr) {
-            if (ImGui::ImageButton((ImTextureID)iconAdd->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
+            if (ImGui::ImageButton((ImTextureID)iconAdd->Resource, imageButtonSize)) {
                 renderAddNewDialog = true;
                 newItem = {};
                 newItem.type = ItemType::DEFAULT;
@@ -264,7 +306,7 @@ void renderTodoList() {
         }
         ImGui::SameLine();
         if (iconOptions != nullptr) {
-            if (ImGui::ImageButton((ImTextureID)iconOptions->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
+            if (ImGui::ImageButton((ImTextureID)iconOptions->Resource, imageButtonSize)) {
                 organizerRendered = !organizerRendered;
             }
         }
@@ -275,7 +317,7 @@ void renderTodoList() {
         }
         ImGui::SameLine();
         if (iconClose != nullptr) {
-            if (ImGui::ImageButton((ImTextureID)iconClose->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
+            if (ImGui::ImageButton((ImTextureID)iconClose->Resource, imageButtonSize)) {
                 todoListRendered = false;
             }
         }
@@ -395,7 +437,7 @@ void renderTodoList() {
                         if (iconRepeat != nullptr) {
                             ImGui::PushID(hashString("changeinterval_" + std::to_string(task->id)));
                             ImTextureID buttonTex = item->repeatMode == RepeatMode::ONCE ? iconNoRepeat->Resource : iconRepeat->Resource;
-                            if (ImGui::ImageButton(buttonTex, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                            if (ImGui::ImageButton(buttonTex, imageButtonSize, { 0,0 }, { 1,1 })) {
                                 renderChangeInterval = true;
                                 changeIntervalPos = ImGui::GetMousePos();
                                 changeIntervalItem = item;
@@ -455,18 +497,11 @@ void renderTodoList() {
                         }
                         ImGui::EndTooltip();
                     }
-                    /* TODO might use this, might not
-                    switch (item->repeatMode) {
-                        case RepeatMode::DAILY: ImGui::Text("(daily)"); break;
-                        case RepeatMode::WEEKLY: ImGui::Text("(weekly)"); break;
-                        default: ImGui::Text("");
-                    } 
-                    */
 
                     ImGui::TableNextColumn(); // Finish button
                     if (iconCheck != nullptr) {
                         ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             task->completionDate = DateTime::nowLocal().toString();
                             task->completed = true;
                             organizerRepo->save();
@@ -483,7 +518,7 @@ void renderTodoList() {
                     ImGui::TableNextColumn(); // Delete button
                     if (iconTrash != nullptr) {
                         ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling, 20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             task->deleted = true;
                             organizerRepo->save();
                         }
@@ -510,14 +545,36 @@ void renderTodoList() {
             for (int i = 0; i < static_cast<int>(RepeatMode::COUNT); ++i) {
                 RepeatMode currentEnum = static_cast<RepeatMode>(i);
                 if (ImGui::Button(RepeatModeValue(currentEnum), { 150 * NexusLink->Scaling, 20 * NexusLink->Scaling })) {
-                    if (!changeIntervalItem->accountConfiguration.contains(accountName) && !accountName.empty()) {
-                        changeIntervalItem->accountConfiguration.emplace(accountName, currentEnum == RepeatMode::ONCE ? false : true);
+
+                    if (currentEnum == RepeatMode::CUSTOM) {
+                        // we do something entirely different here because the settings are super complex: 
+                        // open the configuration at configs tab with the item in edit
+                        // for this we need to do the following:
+                        // - set editItem to changeIntervalItem
+                        editItem = new OrganizerItem(*changeIntervalItem);
+                        editItem->repeatMode = RepeatMode::CUSTOM;
+                        // - figure out on which page of the pagination it actually is and set that flag accordingly
+                        int idx = 0;
+                        for (auto item : organizerRepo->getConfigurableItems()) {
+                            if (item->id == editItem->id) break;
+                            idx++;
+                        }
+                        configCurrentPage = (idx / configItemsPerPage) + 1;
+                        // - set the selected_tab flag
+                        selected_tab = tab_task_settings;
+                        // - set the render config flag
+                        organizerRendered = true;
                     }
-                    else if(!accountName.empty()) {
-                        changeIntervalItem->accountConfiguration[accountName] = currentEnum == RepeatMode::ONCE ? false : true;
+                    else {
+                        if (!changeIntervalItem->accountConfiguration.contains(accountName) && !accountName.empty()) {
+                            changeIntervalItem->accountConfiguration.emplace(accountName, currentEnum == RepeatMode::ONCE ? false : true);
+                        }
+                        else if (!accountName.empty()) {
+                            changeIntervalItem->accountConfiguration[accountName] = currentEnum == RepeatMode::ONCE ? false : true;
+                        }
+                        changeIntervalItem->repeatMode = currentEnum;
+                        organizerRepo->save();
                     }
-                    changeIntervalItem->repeatMode = currentEnum;
-                    organizerRepo->save();
                     changeIntervalItem = nullptr;
                     renderChangeInterval = false;
                 }
@@ -543,11 +600,12 @@ void renderOrganizer() {
 
             // Render vertical card-style tabs
 
-            if (CardTab("Open Tasks", selected_tab == 0)) selected_tab = 0;
-            if (CardTab("Ingame activities", selected_tab == 1)) selected_tab = 1;
-            if (CardTab("Completed Tasks", selected_tab == 2)) selected_tab = 2;
-            if (CardTab("Task configuration", selected_tab == 3)) selected_tab = 3;
-            if (CardTab("Settings", selected_tab == 4)) selected_tab = 4;
+            if (CardTab("Open Tasks", selected_tab == tab_active)) selected_tab = tab_active;
+            if (CardTab("Ingame activities", selected_tab == tab_ingame_activities)) selected_tab = tab_ingame_activities;
+            if (CardTab("Completed Tasks", selected_tab == tab_done)) selected_tab = tab_done;
+            if (CardTab("Task configuration", selected_tab == tab_task_settings)) selected_tab = tab_task_settings;
+            if (CardTab("Statistics", selected_tab == tab_statistics)) selected_tab = tab_statistics;
+            if (CardTab("Settings", selected_tab == tab_organizer_settings)) selected_tab = tab_organizer_settings;
 
             ImGui::EndChild();
         }
@@ -557,11 +615,12 @@ void renderOrganizer() {
         if (ImGui::BeginChild("Right Pane", ImVec2(0, 0), true)) {
             try {
                 switch (selected_tab) {
-                case 0: renderCurrentTasks(); break;
-                case 1: renderAPITasks(); break;
-                case 2: renderDoneTasks(); break;
-                case 3: renderTaskConfiguration(); break;
-                case 4: renderSettings(); break;
+                case tab_active: renderCurrentTasks(); break;
+                case tab_ingame_activities: renderAPITasks(); break;
+                case tab_done: renderDoneTasks(); break;
+                case tab_task_settings: renderTaskConfiguration(); break;
+                case tab_organizer_settings: renderSettings(); break;
+                case tab_statistics: renderStatistics(); break;
                 default: ImGui::Text(("Unknown Tab: " + std::to_string(selected_tab)).c_str());
                 }
             }
@@ -772,7 +831,7 @@ void renderCurrentTasks() {
                 // Finish button
                 if (iconCheck != nullptr) {
                     ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                         task->completionDate = DateTime::nowLocal().toString();
                         task->completed = true;
                         organizerRepo->save();
@@ -785,7 +844,7 @@ void renderCurrentTasks() {
                     }
                 }
                 else {
-                    if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), { 20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
+                    if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), imageButtonSize)) {
                         task->completionDate = DateTime::nowLocal().toString();
                         task->completed = true;
                         organizerRepo->save();
@@ -796,7 +855,7 @@ void renderCurrentTasks() {
             if (task->deleted) {
                 if (iconReactivate != nullptr) {
                     ImGui::PushID(hashString("react_" + std::to_string(task->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                         task->deleted = false;
                         organizerRepo->save();
                     }
@@ -817,7 +876,7 @@ void renderCurrentTasks() {
             else {
                 if (iconTrash != nullptr) {
                     ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                    if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                         task->deleted = true;
                         organizerRepo->save();
                     }
@@ -829,7 +888,7 @@ void renderCurrentTasks() {
                     }
                 }
                 else {
-                    if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), { 20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
+                    if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), imageButtonSize)) {
                         task->deleted = true;
                         organizerRepo->save();
                     }
@@ -840,8 +899,6 @@ void renderCurrentTasks() {
     }
 }
 void renderAPITasks() {
-
-
     ImGui::TextWrapped("Auto tracking completion via GW2 API:");
     ImGui::SameLine();
     if (autotrackActive) {
@@ -1379,7 +1436,7 @@ void renderDoneTasks() {
             ImGui::TableNextColumn(); 
             if (iconReactivate != nullptr) {
                 ImGui::PushID(hashString("react_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                     task->completed = false;
                     task->completionDate = "";
                     organizerRepo->save();
@@ -1401,7 +1458,7 @@ void renderDoneTasks() {
             ImGui::TableNextColumn(); 
             if (iconTrash != nullptr) {
                 ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                     task->deleted = true;
                     organizerRepo->save();
                 }
@@ -1422,7 +1479,7 @@ void renderDoneTasks() {
         ImGui::EndTable();
     }
 
-    // I expect this table to get quite populated quite fast so TODO:
+    // I expect this table to get quite populated quite fast so:
     // - add a drop down "Show last 10, 25, 50"
     // - add pagination
     int currentIndex = doneItemsPerPage == 10 ? 0 : doneItemsPerPage == 25 ? 1 : 2;
@@ -1458,17 +1515,6 @@ void renderDoneTasks() {
         doneCurrentPage++;
         if (doneCurrentPage > totalPagesAvailable) doneCurrentPage = totalPagesAvailable;
     }
-
-    /*
-    * BarChart Sample for later usage
-    std::map<std::string, int> values = { 
-        {"2023-07-01", 5}, 
-        {"2023-07-02", 3}, 
-        {"2023-07-03", 0}, 
-        {"2023-07-04", 4}
-    };
-    BarChart("TasksBarChart", values);
-    */
 }
 void renderTaskConfiguration() {
     char bufferTaskFilter[256];
@@ -1794,7 +1840,7 @@ void renderTaskConfiguration() {
                         // Single time task, begin "start task" routine
                         if (iconStart != nullptr) {
                             ImGui::PushID(hashString("start_" + std::to_string(item->id)));
-                            if (ImGui::ImageButton((ImTextureID)iconStart->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                            if (ImGui::ImageButton((ImTextureID)iconStart->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
 
                                 renderAddNew = true;
                                 newItem = OrganizerItem(*item);
@@ -1842,13 +1888,13 @@ void renderTaskConfiguration() {
                         }
                         else {
                             // is unsubscribed, btnTex should be "subscribe"
-                            btnTex = iconStart;
+                            btnTex = iconSubscribe;
                             subscribe = true;
                         }
 
                         if (btnTex != nullptr) {
                             ImGui::PushID(hashString("subscribe_" + std::to_string(item->id)));
-                            if (ImGui::ImageButton((ImTextureID)btnTex->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                            if (ImGui::ImageButton((ImTextureID)btnTex->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                                 item->accountConfiguration[accountName] = subscribe;
                                 organizerRepo->save();
                                 APIDefs->Events.RaiseNotification(item->repeatMode == RepeatMode::WEEKLY ? EV_NAME_WEEKLY_RESET : EV_NAME_DAILY_RESET);
@@ -1872,7 +1918,7 @@ void renderTaskConfiguration() {
                 else {
                     if (iconSave != nullptr) {
                         ImGui::PushID(hashString("save_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconSave->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconSave->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             item->title = editItem->title;
                             item->description = editItem->description;
                             item->type = editItem->type;
@@ -1919,7 +1965,7 @@ void renderTaskConfiguration() {
                 if (editItem == nullptr || editItem->id != item->id) {
                     if (iconEdit != nullptr) {
                         ImGui::PushID(hashString("edit_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconEdit->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconEdit->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             editItem = new OrganizerItem(*item);
                         }
                         ImGui::PopID();
@@ -1938,7 +1984,7 @@ void renderTaskConfiguration() {
                 else {
                     if (iconCancel != nullptr) {
                         ImGui::PushID(hashString("cancel_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconCancel->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconCancel->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             editItem = nullptr;
                         }
                         ImGui::PopID();
@@ -1960,7 +2006,7 @@ void renderTaskConfiguration() {
                 if (item->deleted) {
                     if (iconReactivate != nullptr) {
                         ImGui::PushID(hashString("react_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             item->deleted = false;
                             organizerRepo->save();
                         }
@@ -1981,7 +2027,7 @@ void renderTaskConfiguration() {
                 else {
                     if (iconTrash != nullptr) {
                         ImGui::PushID(hashString("remove_" + std::to_string(item->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, { 20 * NexusLink->Scaling,20 * NexusLink->Scaling }, { 0,0 }, { 1,1 })) {
+                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             item->deleted = true;
                             organizerRepo->save();
                         }
@@ -2142,7 +2188,7 @@ void renderSettings() {
             else {
                 ImGui::TextWrapped("%s", "No token info available at this time.");
             }
-            
+
             ImGui::TableSetColumnIndex(3);
             if (ImGui::Button(("Remove##" + it->identifier).c_str())) {
                 it = settings.apiKeys.erase(it);  // Remove the key and get the next iterator
@@ -2202,7 +2248,7 @@ void renderSettings() {
     }
 
     ImGui::Separator();
-    
+
     if (ImGui::Button("Trigger Daily Reset")) {
         APIDefs->Events.RaiseNotification(EV_NAME_DAILY_RESET);
     }
@@ -2210,5 +2256,220 @@ void renderSettings() {
     if (ImGui::Button("Trigger Weekly Reset")) {
         APIDefs->Events.RaiseNotification(EV_NAME_WEEKLY_RESET);
     }
+
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(100.0f * NexusLink->Scaling);
+    if (ImGui::InputInt("Delete done/deleted tasks after days (0 = never)", &settings.retentionPeriod)) {
+        StoreSettings();
+    }
+    if (ImGui::Checkbox("Delete configurations with no tasks attached", &settings.deleteEmptyConfigs)) {
+        StoreSettings();
+    }
+    if (settings.deleteEmptyConfigs) {
+        if (ImGui::Checkbox("Delete configurations with no subscribers", &settings.deleteUnsubscribedConfigs)) {
+            StoreSettings();
+        }
+    }
+    ImGui::Text("");
+    ImGui::TextWrapped("Cleanup will run with each addon load. During cleanup, all completed and deleted tasks that are older than the retention period configured will be physically removed from the data set.");
+    if (settings.deleteEmptyConfigs) {
+        ImGui::PushStyleColor(ImGuiCol_Text, colorRed);
+        ImGui::TextWrapped("If a configuration has no more tasks attached to it, it will also be removed permanently.");
+        if (settings.deleteUnsubscribedConfigs) {
+            ImGui::TextWrapped("If a configuration has no subscribers attached to it, it will also be removed permanently.");
+        }
+        ImGui::PopStyleColor();
+    }
+    if (ImGui::Button("Perform cleanup now")) {
+        organizerRepo->performCleanup();
+    }   
+}
+void renderStatistics() {
+    // Create sort of a split pane like for the main window;
+    // Left side becomes a lean list of task configurations that are selectable for the statistics
+    // Right side becomes the charts
+    // Controls for charts probably go either to the left Pane above all, or bottom below all
+    // if below all, Left pane max height should be twice the chart height; so if more configs are available,
+    // we want this pane to scroll. else we do not really care, scrolling should only become available if list exceeds main window height
     
+    if (ImGui::BeginChild("StatisticsFilterPane", ImVec2(180 * NexusLink->Scaling, 0), true)) {
+        ImGui::Text("From:");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(60.0f);
+        if (ImGui::Button(statisticsStart.toStringNice().substr(0, 10).c_str())) {
+            ImGui::OpenPopup("StatisticsBeginPopup");
+        }
+        if (ImGui::BeginPopupModal("StatisticsBeginPopup")) {
+            auto date = statisticsStart.toString();
+            if (DateTimePicker("Statistics Begin", date, false)) {
+                statisticsStart = DateTime(date);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        ImGui::Text("To:");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(60.0f);
+        if (ImGui::Button(statisticsEnd.toStringNice().substr(0, 10).c_str())) {
+            ImGui::OpenPopup("StatisticsEndPopup");
+        }
+        if (ImGui::BeginPopupModal("StatisticsEndPopup")) {
+
+            auto date = statisticsEnd.toString();
+            if (DateTimePicker("Statistics End", date, false)) {
+                statisticsEnd = DateTime(date);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (ImGui::RadioButton("Bar Chart", statisticsChartType == ChartType::BAR_CHART)) {
+            statisticsChartType = ChartType::BAR_CHART;
+        }
+        if (ImGui::RadioButton("Line Chart", statisticsChartType == ChartType::LINE_CHART)) {
+            statisticsChartType = ChartType::LINE_CHART;
+        }
+
+        ImGui::Separator();
+
+        for (const auto& item : organizerRepo->getConfigurableItems()) {
+            if (statisticsFilter.find(item->id) == statisticsFilter.end()) {
+                statisticsFilter[item->id] = true; // Initialize as not selected
+            }
+        }
+        for (const auto& item : organizerRepo->getApiTaskConfigurables()) {
+            if (item->accountConfiguration.empty()) continue; // no API tasks that have 0 subscribers
+            bool subscribed = false;
+            for (auto sub : item->accountConfiguration) {
+                if (sub.second) {
+                    subscribed = true;
+                    break;
+                }
+            }
+            if (!subscribed) continue; // not subscribed currently
+
+            if (statisticsFilter.find(item->item.id) == statisticsFilter.end()) {
+                statisticsFilter[item->item.id] = true; // Initialize as not selected
+            }
+        }
+
+        bool allSelected = true;
+        for (const auto& item : organizerRepo->getConfigurableItems()) {
+            if (!statisticsFilter[item->id]) {
+                allSelected = false;
+                break;
+            }
+        }
+        if (allSelected) { // only continue if not already broken out earlier
+            for (const auto& item : organizerRepo->getApiTaskConfigurables()) {
+                if (item->accountConfiguration.empty()) continue; // no API tasks that have 0 subscribers
+                bool subscribed = false;
+                for (auto sub : item->accountConfiguration) {
+                    if (sub.second) {
+                        subscribed = true;
+                        break;
+                    }
+                }
+                if (!subscribed) continue; // not subscribed currently
+
+                if (!statisticsFilter[item->item.id]) {
+                    allSelected = false;
+                    break;
+                }
+            }
+        }
+
+        bool selectAll = allSelected;
+        if (ImGui::Checkbox("Select All", &selectAll)) {
+            for (auto entry : statisticsFilter) {
+                statisticsFilter[entry.first] = selectAll;
+            }
+        }
+        ImGui::Separator();
+
+        for (auto item : organizerRepo->getConfigurableItems()) {
+            bool selected = statisticsFilter[item->id];
+
+            // Start wrapping text
+            if (ImGui::Checkbox(("##checkbox" + std::to_string(item->id)).c_str(), &selected)) {
+                statisticsFilter[item->id] = selected;
+            }
+            ImGui::SameLine();
+            ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
+            ImGui::TextWrapped("%s", item->title.c_str()); // Display wrapped text
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::Separator();
+        for (auto item : organizerRepo->getApiTaskConfigurables()) {
+            if (item->accountConfiguration.empty()) continue; // no API tasks that have 0 subscribers
+            bool subscribed = false;
+            for (auto sub : item->accountConfiguration) {
+                if (sub.second) {
+                    subscribed = true;
+                    break;
+                }
+            }
+            if (!subscribed) continue; // not subscribed currently
+
+            bool selected = statisticsFilter[item->item.id];
+
+            // Start wrapping text
+            if (ImGui::Checkbox(("##checkbox" + std::to_string(item->item.id)).c_str(), &selected)) {
+                statisticsFilter[item->item.id] = selected;
+            }
+            ImGui::SameLine();
+            ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
+            ImGui::TextWrapped("%s", item->item.title.c_str()); // Display wrapped text
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::EndChild();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::BeginChild("StatisticsGraphsPane", ImVec2(0, 0), true)) {
+
+        std::map<std::string, int> startedTasks = {};
+        std::map<std::string, int> completedTasks = {};
+
+        auto current = statisticsStart;
+        // "fix" end date;
+        // the user provides the end date at 00:00:00 typically;
+        // because I am a lazy bum and did never implement <= for DateTime, I just add a day here instead and logically have the same result
+        auto fixedEnd = DateTime(statisticsEnd).addDays(1);
+        while (current < fixedEnd) {
+            std::string label = current.toStringNice().substr(0, 10);
+            startedTasks[label] = 0;
+            completedTasks[label] = 0;
+            current = current.addDays(1);
+        }
+
+        for (auto task : organizerRepo->getTaskInstances()) {
+            OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+            if (task->deleted) continue; // TODO possible override flag?
+            if (!statisticsFilter[item->id]) continue; // item filtered
+
+            // completion checks first
+            if (task->completed) {
+                auto completionDate = DateTime(task->completionDate);
+                if (completionDate > statisticsStart && completionDate < fixedEnd) {
+                    std::string endLabel = completionDate.toStringNice().substr(0, 10);
+                    completedTasks[endLabel]++;
+                }
+            }
+
+            auto startDate = DateTime(task->startDate);
+            if (startDate < statisticsStart) continue;
+            if (startDate > fixedEnd) continue;
+            std::string startLabel = startDate.toStringNice().substr(0, 10);
+            startedTasks[startLabel]++;
+        }
+
+        BarChart("Started Tasks", startedTasks, NexusLink->Scaling, statisticsChartType);
+        ImGui::Separator();
+        BarChart("Completed Tasks", completedTasks, NexusLink->Scaling, statisticsChartType);
+        ImGui::Separator();
+
+        ImGui::EndChild();
+    }
 }

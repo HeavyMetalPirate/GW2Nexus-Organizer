@@ -26,6 +26,8 @@ static const std::map<int, int> calender = {
 	{12,31}
 };
 
+static const int organizerItemStartId = 10000;
+
 static const char* monthsComboBoxItems[12] = {
 	"Jan","Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
