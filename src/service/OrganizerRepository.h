@@ -3,6 +3,7 @@
 
 #include "../Globals.h"
 #include "DataLoadingFunctions.h"
+#include <mutex>
 
 enum class SortProperty : int {
 	NAME = 0,
@@ -160,6 +161,8 @@ public:
 	bool accountProgressInitialized = false;
 
 private:
+	std::mutex saveMutex;
+
 	SortProperty currentSort;
 	bool ascendingSort;
 

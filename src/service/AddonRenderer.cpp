@@ -204,12 +204,12 @@ void renderNewTaskDialog() {
             ImGui::EndCombo();
         }
 
-        char bufferTitle[256];
+        static char bufferTitle[256] = "";
         strncpy_s(bufferTitle, newItem.title.c_str(), sizeof(bufferTitle));
         if (ImGui::InputText("Title", bufferTitle, sizeof(bufferTitle))) {
             newItem.title = bufferTitle;
         }
-        char bufferDesc[2048];
+        static char bufferDesc[2048] = "";
         strncpy_s(bufferDesc, newItem.description.c_str(), sizeof(bufferDesc));
         if (ImGui::InputTextMultiline("Description", bufferDesc, sizeof(bufferDesc))) {
             newItem.description = bufferDesc;
@@ -329,13 +329,11 @@ void renderTodoList() {
         ImGui::Separator();
         
         // Finally, content.
-        char bufferNewTask[256];
-        strncpy_s(bufferNewTask, newTaskName.c_str(), sizeof(bufferNewTask));
-        if (ImGui::InputText("##TaskName", bufferNewTask, sizeof(bufferNewTask))) {
-            newTaskName = bufferNewTask;
-        }
+        static char bufferNewTask[256] = "";
+        ImGui::InputText("##TaskName", bufferNewTask, IM_ARRAYSIZE(bufferNewTask));
         ImGui::SameLine();
         if (ImGui::Button("Create Task")) {
+            newTaskName = bufferNewTask;
             if (!newTaskName.empty()) {
                 newItem = {};
                 newItem.title = newTaskName;
@@ -368,15 +366,17 @@ void renderTodoList() {
                 newItem = {};
                 newInstance = {};
                 newTaskName = "";
+                strncpy_s(bufferNewTask, newTaskName.c_str(), sizeof(bufferNewTask));
             }
         }
 
         if (ImGui::CollapsingHeader("Filter")) {
-            char bufferTaskFilter[256];
-            strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
-            if (ImGui::InputText("Filter", bufferTaskFilter, sizeof(bufferTaskFilter))) {
+            static char bufferTaskFilter[256] = "";
+            ImGui::SetNextItemWidth(ImGui::GetWindowWidth());
+            if (ImGui::InputText("##Filter", bufferTaskFilter, IM_ARRAYSIZE(bufferTaskFilter))) {
                 tableFilter = bufferTaskFilter;
             }
+            
             if (!accountName.empty()) {
                 ImGui::Checkbox("Show only tasks of this account", &displayOwnOnly);
             }
@@ -682,12 +682,12 @@ void renderCurrentTasks() {
             ImGui::EndCombo();
         }
 
-        char bufferTitle[256];
+        static char bufferTitle[256] = "";
         strncpy_s(bufferTitle, newItem.title.c_str(), sizeof(bufferTitle));
         if (ImGui::InputText("Title", bufferTitle, sizeof(bufferTitle))) {
             newItem.title = bufferTitle;
         }
-        char bufferDesc[2048];
+        static char bufferDesc[2048] = "";
         strncpy_s(bufferDesc, newItem.description.c_str(), sizeof(bufferDesc));
         if (ImGui::InputTextMultiline("Description", bufferDesc, sizeof(bufferDesc))) {
             newItem.description = bufferDesc;
@@ -740,7 +740,7 @@ void renderCurrentTasks() {
         ImGui::EndChild();
     }
 
-    char bufferTaskFilter[256];
+    static char bufferTaskFilter[256] = "";
     strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
     if (ImGui::InputText("Filter Table", bufferTaskFilter, sizeof(bufferTaskFilter))) {
         tableFilter = bufferTaskFilter;
@@ -1358,7 +1358,7 @@ void renderAPITasks() {
     }
 }
 void renderDoneTasks() {
-    char bufferTaskFilter[256];
+    static char bufferTaskFilter[256] = "";
     strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
     if (ImGui::InputText("Filter Table", bufferTaskFilter, sizeof(bufferTaskFilter))) {
         tableFilter = bufferTaskFilter;
@@ -1517,7 +1517,7 @@ void renderDoneTasks() {
     }
 }
 void renderTaskConfiguration() {
-    char bufferTaskFilter[256];
+    static char bufferTaskFilter[256] = "";
     strncpy_s(bufferTaskFilter, tableFilter.c_str(), sizeof(bufferTaskFilter));
     if (ImGui::InputText("Filter Table", bufferTaskFilter, sizeof(bufferTaskFilter))) {
         tableFilter = bufferTaskFilter;
@@ -1583,7 +1583,7 @@ void renderTaskConfiguration() {
                 ImGui::TextWrapped(item->title.c_str());
             }
             else {
-                char bufferTitle[256];
+                static char bufferTitle[256] = "";
                 strncpy_s(bufferTitle, editItem->title.c_str(), sizeof(bufferTitle));
                 ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::InputText("##Title", bufferTitle, sizeof(bufferTitle))) {
@@ -1596,7 +1596,7 @@ void renderTaskConfiguration() {
                 ImGui::TextWrapped(item->description.c_str());
             }
             else {
-                char bufferDesc[256];
+                static char bufferDesc[256] = "";
                 strncpy_s(bufferDesc, editItem->description.c_str(), sizeof(bufferDesc));
                 ImGui::PushItemWidth(-FLT_MIN); // Use remaining space for the item
                 if (ImGui::InputTextMultiline("##Desc", bufferDesc, sizeof(bufferDesc))) {

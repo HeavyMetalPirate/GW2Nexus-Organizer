@@ -132,6 +132,7 @@ void OrganizerRepository::unload() {
 }
 
 void OrganizerRepository::save() {
+	std::lock_guard<std::mutex> guard(saveMutex);
 	try {
 		std::vector<OrganizerItem> config = std::vector<OrganizerItem>();
 		for (auto item : configurableItems) config.push_back(*item);
@@ -162,7 +163,10 @@ void OrganizerRepository::save() {
 		}
 
 		std::vector<ApiTaskConfigurable> apiConfigurables = std::vector<ApiTaskConfigurable>();
-		for (auto item : apiTaskConfigurables) apiConfigurables.push_back(*item);
+		for (auto item : apiTaskConfigurables) {
+			ApiTaskConfigurable configurable = ApiTaskConfigurable(*item);
+			apiConfigurables.push_back(configurable);
+		}
 		j = apiConfigurables;
 
 		std::string pathDataApiTasks = getAddonFolder() + "/auto_tracked.json";

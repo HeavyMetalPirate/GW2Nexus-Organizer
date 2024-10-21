@@ -83,7 +83,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
 	AddonDef.Version.Minor = 3;
-	AddonDef.Version.Build = 0;
+	AddonDef.Version.Build = 1;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
@@ -148,8 +148,10 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SUBSCRIBE", IDB_ICON_SUBSCRIBE, hSelf, nullptr);
 
 	APIDefs->InputBinds.RegisterWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
-	APIDefs->QuickAccess.Add("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
-	APIDefs->QuickAccess.AddContextMenu("ORG_CONTEXT_MENU", "ORG_SHORTCUT", AddonSimpleShortcut);
+	if (!settings.hideShortcut) {
+		APIDefs->QuickAccess.Add("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
+		APIDefs->QuickAccess.AddContextMenu("ORG_CONTEXT_MENU", "ORG_SHORTCUT", AddonSimpleShortcut);
+	}
 
 	// Events
 	APIDefs->Events.Subscribe("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
@@ -163,7 +165,7 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->Renderer.Register(ERenderType_PreRender, AddonPreRender);
 	APIDefs->Renderer.Register(ERenderType_Render, AddonRender);
 	APIDefs->Renderer.Register(ERenderType_PostRender, AddonPostRender);
-	//APIDefs->Renderer.Register(ERenderType_OptionsRender, AddonOptions);
+	APIDefs->Renderer.Register(ERenderType_OptionsRender, AddonOptions);
 
 	APIDefs->Events.RaiseNotification("EV_REQUEST_ACCOUNT_NAME"); // Request account name at load
 	APIDefs->Events.RaiseNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
@@ -194,8 +196,10 @@ void AddonUnload()
 	StoreSettings();
 	organizerRepo->save();
 
-	APIDefs->QuickAccess.Remove("ORG_SHORTCUT");
-	APIDefs->QuickAccess.RemoveContextMenu("ORG_CONTEXT_MENU");
+	if (!settings.hideShortcut) {
+		APIDefs->QuickAccess.Remove("ORG_SHORTCUT");
+		APIDefs->QuickAccess.RemoveContextMenu("ORG_CONTEXT_MENU");
+	}
 	APIDefs->InputBinds.Deregister("ORG_KEYBIND");
 
 	APIDefs->Events.Unsubscribe("EV_MUMBLE_IDENTITY_UPDATED", HandleIdentityChanged);
@@ -208,7 +212,7 @@ void AddonUnload()
 	APIDefs->Renderer.Deregister(AddonPreRender);
 	APIDefs->Renderer.Deregister(AddonRender);
 	APIDefs->Renderer.Deregister(AddonPostRender);
-	//APIDefs->DeregisterRender(AddonOptions);
+	APIDefs->Renderer.Deregister(AddonOptions);
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#ff0000>Signing off</c>, it was an honor commander.");
 }
@@ -230,7 +234,19 @@ void AddonRender()
 ///----------------------------------------------------------------------------------------------------
 void AddonOptions()
 {
-	// TODO impl
+	if (ImGui::Checkbox("Hide Shortcut Icon", &settings.hideShortcut)) {
+		if (settings.hideShortcut) {
+			APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Hiding QuickAccess button.");
+			APIDefs->QuickAccess.Remove("ORG_SHORTCUT");
+			APIDefs->QuickAccess.RemoveContextMenu("ORG_CONTEXT_MENU");
+		}
+		else {
+			APIDefs->Log(ELogLevel_INFO, ADDON_NAME, "Showing QuickAccess button.");
+			APIDefs->QuickAccess.Add("ORG_SHORTCUT", "ICON_ORGANIZER_SHORTCUT", "ICON_ORGANIZER_SHORTCUT_HOVER", "ORG_KEYBIND", "Organizer");
+			APIDefs->QuickAccess.AddContextMenu("ORG_CONTEXT_MENU", "ORG_SHORTCUT", AddonSimpleShortcut);
+		}
+		StoreSettings();
+	}
 }
 
 void AddonSimpleShortcut() {
@@ -251,7 +267,7 @@ void ProcessKeybind(const char* aIdentifier, bool isRelease)
 {
 	if (strcmp(aIdentifier, "ORG_KEYBIND") == 0)
 	{
-		todoListRendered = !todoListRendered;
+		if(!isRelease) todoListRendered = !todoListRendered; // only flip on press
 		return;
 	}
 }

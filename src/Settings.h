@@ -27,10 +27,11 @@ namespace addon {
 		int retentionPeriod;
 		bool deleteEmptyConfigs;
 		bool deleteUnsubscribedConfigs;
+		bool hideShortcut;
 	};
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Notifications, enabled, x, y, width, height, duration, direction, minutesUntilDue);
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ApiKey, apiKey, identifier);
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, apiKeys, notifications, retentionPeriod, deleteEmptyConfigs, deleteUnsubscribedConfigs);
+	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, apiKeys, notifications, retentionPeriod, deleteEmptyConfigs, deleteUnsubscribedConfigs, hideShortcut);
 
 }
 
