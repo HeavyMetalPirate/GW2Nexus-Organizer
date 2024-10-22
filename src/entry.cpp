@@ -83,7 +83,7 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
 	AddonDef.Version.Minor = 3;
-	AddonDef.Version.Build = 1;
+	AddonDef.Version.Build = 2;
 	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
@@ -146,6 +146,8 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SAVE", IDB_ICON_SAVE, hSelf, nullptr);
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_CANCEL", IDB_ICON_CANCEL, hSelf, nullptr);
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SUBSCRIBE", IDB_ICON_SUBSCRIBE, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_PIN", IDB_ICON_PIN, hSelf, nullptr);
+
 
 	APIDefs->InputBinds.RegisterWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
 	if (!settings.hideShortcut) {
@@ -169,6 +171,9 @@ void AddonLoad(AddonAPI* aApi)
 
 	APIDefs->Events.RaiseNotification("EV_REQUEST_ACCOUNT_NAME"); // Request account name at load
 	APIDefs->Events.RaiseNotification("EV_REPLAY_ARCDPS_SQUAD_JOIN"); // Request all squad joins in case player is in a squad at load time
+
+	APIDefs->UI.RegisterCloseOnEscape("Organizer", &organizerRendered);
+	APIDefs->UI.RegisterCloseOnEscape("TODOs", &todoListRendered);
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#00ff00>Organizer</c> was loaded.");
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, ("Current Date/Time: " + DateTime::nowLocal().toString()).c_str());
@@ -213,6 +218,9 @@ void AddonUnload()
 	APIDefs->Renderer.Deregister(AddonRender);
 	APIDefs->Renderer.Deregister(AddonPostRender);
 	APIDefs->Renderer.Deregister(AddonOptions);
+
+	APIDefs->UI.DeregisterCloseOnEscape("Organizer");
+	APIDefs->UI.DeregisterCloseOnEscape("TODOs");
 
 	APIDefs->Log(ELogLevel_DEBUG, ADDON_NAME, "<c=#ff0000>Signing off</c>, it was an honor commander.");
 }
@@ -306,34 +314,4 @@ void HandleTriggerDailyReset(void* eventArgs) {
 }
 void HandleTriggerWeeklyReset(void* eventArgs) {
 	autoStartService.PerformWeeklyReset();
-}
-
-/* ImGui Explorer Functions */
-typedef struct {
-	float delta_time;
-	float screen_width;
-	float screen_height;
-} Env;
-
-// Initial setup (does not get called again on reload)
-extern "C" __declspec(dllexport) void plug_init(ImGuiContext* ctx) {
-
-}
-// Called before reloading the library
-// used to return a state object that will be passed to plug_post_reload
-// and to clean up any additional resources you might have created
-extern "C" __declspec(dllexport) void* plug_pre_reload(void) {
-	return nullptr;
-}
-// gets called after reloading the library with the state object returned by plug_pre_reload
-extern "C" __declspec(dllexport) void plug_post_reload(void* state) {
-	
-}
-// Called every frame
-extern "C" __declspec(dllexport) void plug_update(Env env) {
-
-}
-// unused, but might be used to reset your state
-extern "C" __declspec(dllexport) void plug_reset(void) {
-
 }

@@ -238,6 +238,7 @@
     <Image Include="resources\BtnEdit.png" />
     <Image Include="resources\BtnNoRepetition.png" />
     <Image Include="resources\BtnOptions.png" />
+    <Image Include="resources\BtnPin.png" />
     <Image Include="resources\BtnReactivate.png" />
     <Image Include="resources\BtnSave.png" />
     <Image Include="resources\BtnStart.png" />

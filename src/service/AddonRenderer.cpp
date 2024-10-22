@@ -15,6 +15,8 @@ void renderSettings();
 void renderNewTaskDialog();
 
 /* control flags */        
+bool todoListPinned = false;
+
 static int selected_tab = 0;
 
 bool renderAddNew = false;
@@ -68,6 +70,7 @@ Texture* iconEdit = nullptr;
 Texture* iconSave = nullptr;
 Texture* iconCancel = nullptr;
 Texture* iconSubscribe = nullptr;
+Texture* iconPin = nullptr;
 
 /* Pagination */
 static const char* itemsPerPageComboItems[] = { "10", "25", "50" };
@@ -114,6 +117,8 @@ void Renderer::preRender() {
         iconCancel = APIDefs->Textures.Get("ICON_ORGANIZER_CANCEL");
     if (iconSubscribe == nullptr)
         iconSubscribe = APIDefs->Textures.Get("ICON_ORGANIZER_SUBSCRIBE");
+    if (iconPin == nullptr)
+        iconPin = APIDefs->Textures.Get("ICON_ORGANIZER_PIN");
 
 
     if (accountName.empty()) displayOwnOnly = false;
@@ -266,7 +271,7 @@ void renderNewTaskDialog() {
 }
 
 void renderTodoList() {
-    if (!todoListRendered) return;
+    if (!todoListRendered && !todoListPinned) return;
 
     ImGui::SetNextWindowSize(ImVec2(370.0f, 350.0f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("TODOs", &todoListRendered, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar
@@ -275,7 +280,7 @@ void renderTodoList() {
         ImGui::PushFont((ImFont*)NexusLink->FontBig);
         ImGui::Text("TODOs");
         ImGui::PopFont();
-        ImGui::SameLine(ImGui::GetWindowWidth() - (3 * (32 * NexusLink->Scaling) + 5)); // 3* buttons plus 5 generic to the edge
+        ImGui::SameLine(ImGui::GetWindowWidth() - (4 * (32 * NexusLink->Scaling) + 5)); // 3* buttons plus 5 generic to the edge
         if (iconAdd != nullptr) {
             if (ImGui::ImageButton((ImTextureID)iconAdd->Resource, imageButtonSize)) {
                 renderAddNewDialog = true;
@@ -316,14 +321,44 @@ void renderTodoList() {
             }
         }
         ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, todoListPinned ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
+        if (iconPin != nullptr) {
+            if (ImGui::ImageButton((ImTextureID)iconPin->Resource, imageButtonSize)) {
+                todoListPinned = !todoListPinned;
+                // (De)Register Close On Escape
+                // if we don't deregister, one tap on ESC will be "wasted" because Nexus still toggles the flag but changes nothing
+                // This oughta help improve the user experience
+                if (todoListPinned) {
+                    APIDefs->UI.DeregisterCloseOnEscape("TODOs");
+                }
+                else {
+                    APIDefs->UI.RegisterCloseOnEscape("TODOs", &todoListRendered);
+                }
+            }
+        }
+        else {
+            if (ImGui::Button("Pin", { 20,20 })) {
+                todoListPinned = !todoListPinned;
+                if (todoListPinned) {
+                    APIDefs->UI.DeregisterCloseOnEscape("TODOs");
+                }
+                else {
+                    APIDefs->UI.RegisterCloseOnEscape("TODOs", &todoListRendered);
+                }
+            }
+        }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
         if (iconClose != nullptr) {
             if (ImGui::ImageButton((ImTextureID)iconClose->Resource, imageButtonSize)) {
                 todoListRendered = false;
+                todoListPinned = false;
             }
         }
         else {
             if (ImGui::Button("X", { 20,20 })) {
                 todoListRendered = false;
+                todoListPinned = false;
             }
         }
         ImGui::Separator();
