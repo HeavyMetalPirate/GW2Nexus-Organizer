@@ -127,13 +127,9 @@ void Renderer::render() {
     ImGuiStyle& style = ImGui::GetStyle();
 
     ImVec2 oldPadding = style.FramePadding;
-    //ImVec2 oldSpacing = style.ItemSpacing;
-    //ImVec2 oldInnerSpacing = style.ItemInnerSpacing;
     float oldBorderSize = style.FrameBorderSize;
 
     style.FramePadding = ImVec2(0, 0);  
-    //style.ItemSpacing = ImVec2(0, 0);   
-    //style.ItemInnerSpacing = ImVec2(0, 0);
     style.FrameBorderSize = 0.0f;
 
     try {
@@ -165,8 +161,6 @@ void Renderer::render() {
     }
 
     style.FramePadding = oldPadding;
-    //style.ItemSpacing = oldSpacing;
-    //style.ItemInnerSpacing = oldInnerSpacing;
     style.FrameBorderSize = oldBorderSize;
 }
 void Renderer::postRender() {
@@ -280,7 +274,13 @@ void renderTodoList() {
         ImGui::PushFont((ImFont*)NexusLink->FontBig);
         ImGui::Text("TODOs");
         ImGui::PopFont();
-        ImGui::SameLine(ImGui::GetWindowWidth() - (4 * (32 * NexusLink->Scaling) + 5)); // 3* buttons plus 5 generic to the edge
+        // calculate starting position for buttons
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        const float offsetX = 5.0f;
+        const float totalButtonsWidth = 4 * imageButtonSize.x + 3 * spacing;
+        const float startX = ImGui::GetWindowWidth() - totalButtonsWidth - offsetX;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(startX);
         if (iconAdd != nullptr) {
             if (ImGui::ImageButton((ImTextureID)iconAdd->Resource, imageButtonSize)) {
                 renderAddNewDialog = true;
@@ -309,6 +309,11 @@ void renderTodoList() {
                 newInstance.completed = false;
             }
         }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("New Task");
+            ImGui::EndTooltip();
+        }
         ImGui::SameLine();
         if (iconOptions != nullptr) {
             if (ImGui::ImageButton((ImTextureID)iconOptions->Resource, imageButtonSize)) {
@@ -319,6 +324,11 @@ void renderTodoList() {
             if (ImGui::Button("O", { 20,20 })) {
                 organizerRendered = !organizerRendered;
             }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Settings & Statistics");
+            ImGui::EndTooltip();
         }
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, todoListPinned ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
@@ -347,6 +357,17 @@ void renderTodoList() {
                 }
             }
         }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            if (todoListPinned) {
+                ImGui::Text("Unpin TODO list");
+            }
+            else {
+                ImGui::Text("Pin TODO list");
+                ImGui::TextColored({ 0.3f,0.3f,0.3f,1.0f }, "Prevents closing with ESC");
+            }
+            ImGui::EndTooltip();
+        }
         ImGui::PopStyleColor();
         ImGui::SameLine();
         if (iconClose != nullptr) {
@@ -360,6 +381,12 @@ void renderTodoList() {
                 todoListRendered = false;
                 todoListPinned = false;
             }
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Close");
+            ImGui::EndTooltip();
         }
         ImGui::Separator();
         
