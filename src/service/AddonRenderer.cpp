@@ -2471,6 +2471,7 @@ bool renderTodoTaskRow(OrganizerItemInstance* task, bool isChild) {
 
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(300.0f * NexusLink->Scaling);  // Set a fixed wrap width
         ImGui::TextWrapped(item->description.c_str());
 
         ImGui::Text("");
@@ -2486,7 +2487,6 @@ bool renderTodoTaskRow(OrganizerItemInstance* task, bool isChild) {
         }
         ImGui::EndTooltip();
     }
-
 
     if (!task->childItems.empty() && !isChild) {
         if (iconList) {
