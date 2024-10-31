@@ -138,6 +138,10 @@ public:
 	void addAccountProgression(std::string progressionId, std::string accountName);
 	std::vector<std::string> getAccountProgression(std::string progressionId);
 
+	void CompleteTask(OrganizerItemInstance* task);
+	void DeleteTask(OrganizerItemInstance* task);
+	void RestoreTask(OrganizerItemInstance* task);
+
 	// Wizards Vault progress
 	std::map<std::string, gw2::wizardsvault::MetaProgress> wizardsVaultDaily = std::map<std::string, gw2::wizardsvault::MetaProgress>();
 	std::map<std::string, gw2::wizardsvault::MetaProgress> wizardsVaultWeekly = std::map<std::string, gw2::wizardsvault::MetaProgress>();

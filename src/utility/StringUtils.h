@@ -1,8 +1,20 @@
 #ifndef STRING_UTILS_H
 #define STRING_UTILS_H
 
-#include <string>
 #include <algorithm>
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <ranges>
+#include <sstream>
+
+inline bool string_replace(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = str.find(from);
+    if (start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
+}
 
 inline std::string toLower(const std::string& str) {
 	std::string lowerStr = str;

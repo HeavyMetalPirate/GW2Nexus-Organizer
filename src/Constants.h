@@ -28,6 +28,17 @@ static const std::map<int, int> calender = {
 
 static const int organizerItemStartId = 10000;
 
+/* Achievement Group Constants */
+static const int ACHIEVEMENT_GROUP_DAILY_FRACTALS = 88;
+static const int ACHIEVEMENT_GROUP_LWS3 = 238;
+static const int ACHIEVEMENT_GROUP_LWS4 = 243;
+static const int ACHIEVEMENT_GROUP_STRIKES = 250;
+static const int ACHIEVEMENT_GROUP_EOD = 321;
+static const int ACHIEVEMENT_GROUP_IBS = 330;
+static const int ACHIEVEMENT_GROUP_WEEKLY_FRACTALS = 261;
+static const int ACHIEVEMENT_GROUP_WVW = 346;
+static const int ACHIEVEMENT_GROUP_RIFTS = 365;
+
 static const char* monthsComboBoxItems[12] = {
 	"Jan","Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };

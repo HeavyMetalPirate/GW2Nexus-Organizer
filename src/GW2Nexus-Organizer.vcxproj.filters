@@ -97,6 +97,10 @@
     <Image Include="resources\BtnSave.png" />
     <Image Include="resources\BtnSubscribe.png" />
     <Image Include="resources\BtnPin.png" />
+    <Image Include="resources\icon_listitem.png" />
+    <Image Include="resources\BtnCollapseList.png" />
+    <Image Include="resources\BtnExpandList.png" />
+    <Image Include="resources\icon_list.png" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="devnotes.txt" />

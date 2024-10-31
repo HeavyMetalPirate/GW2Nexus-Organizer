@@ -320,6 +320,14 @@ void OrganizerRepository::addConfigurableItem(OrganizerItem* item) {
 void OrganizerRepository::addTaskInstance(OrganizerItemInstance* instance) {
 	if (instance->id > 0 || instance->itemId == 0) return; // sanity checks before adding a known or defect item
 	instance->id = getNextTaskInstanceId();
+
+	if (!instance->childItems.empty()) {
+		for(int i = 0; i < instance->childItems.size(); i++) {
+			instance->childItems[i].parentId = instance->id;
+			instance->childItems[i].id = i;
+		}
+	}
+
 	taskInstances.push_back(instance);
 	save();
 }
@@ -395,6 +403,133 @@ std::vector<std::string> OrganizerRepository::getAccountProgression(std::string 
 		progressionPerAccount.emplace(progressionId, std::vector<std::string>());
 	}
 	return progressionPerAccount.at(progressionId);
+}
+
+void OrganizerRepository::CompleteTask(OrganizerItemInstance* task) {
+	if (task->parentId == 0) {
+		// we are dealing with a (possible parent)
+		task->completionDate = DateTime::nowLocal().toString();
+		task->completed = true;
+		// complete children check
+		if (task->childItems.size() > 0) {
+			for (int i = 0; i < task->childItems.size(); i++) {
+				task->childItems[i].completionDate = task->completionDate;
+				task->childItems[i].completed = true;
+			}
+		}
+	}
+	else {
+		// we are dealing with a definite child
+		int parentIndex = 0;
+		// find parent
+		for (auto instance : this->taskInstances) {
+			if (instance->id == task->parentId) {
+				break;
+			}
+			parentIndex++;
+		}
+		// if parent found, we know the child task index == id
+		if (parentIndex < this->taskInstances.size()) {
+			bool allComplete = true; // do wrong positive search thingy
+			this->taskInstances[parentIndex]->childItems[task->id].completed = true;
+			this->taskInstances[parentIndex]->childItems[task->id].completionDate = DateTime::nowLocal().toString();
+
+			// check full completion
+			for (auto child : this->taskInstances[parentIndex]->childItems) {
+				// check for deleted tasks as well
+				if (!child.completed && !child.deleted) {
+					allComplete = false;
+					break;
+				}
+			}
+			if (allComplete) {
+				taskInstances[parentIndex]->completionDate = DateTime::nowLocal().toString();
+				taskInstances[parentIndex]->completed = true;
+			}
+		}
+	}
+ 	this->save();
+}
+void OrganizerRepository::DeleteTask(OrganizerItemInstance* task) {
+	if (task->parentId == 0) {
+		// we are dealing with a (possible parent)
+		task->deleted = true;
+		// complete children check
+		if (task->childItems.size() > 0) {
+			for (int i = 0; i < task->childItems.size(); i++) {
+				task->childItems[i].deleted = true;
+			}
+		}
+	}
+	else {
+		// we are dealing with a definite child
+		int parentIndex = 0;
+		// find parent
+		for (auto instance : this->taskInstances) {
+			if (instance->id == task->parentId) {
+				break;
+			}
+			parentIndex++;
+		}
+		// if parent found, we know the child task index == id
+		if (parentIndex < this->taskInstances.size()) {
+			bool allDeleted = true; // do wrong positive search thingy
+			this->taskInstances[parentIndex]->childItems[task->id].deleted = true;
+			
+			// check full completion
+			for (auto child : this->taskInstances[parentIndex]->childItems) {
+				// check for deleted tasks as well
+				if (!child.completed && !child.deleted) {
+					allDeleted = false;
+					break;
+				}
+			}
+			if (allDeleted) {
+				taskInstances[parentIndex]->deleted = true;
+			}
+		}
+	}
+	this->save();
+}
+void OrganizerRepository::RestoreTask(OrganizerItemInstance* task) {
+	if (task->parentId == 0) {
+		// we are dealing with a (possible parent)
+		task->deleted = false;
+		task->completed = false;
+		task->completionDate = "";
+
+		// complete children check
+		if (task->childItems.size() > 0) {
+			for (int i = 0; i < task->childItems.size(); i++) {
+				task->childItems[i].deleted = false;
+				task->childItems[i].completed = false;
+				task->childItems[i].completionDate = "";
+			}
+		}
+	}
+	else {
+		// we are dealing with a definite child
+		int parentIndex = 0;
+		// find parent
+		for (auto instance : this->taskInstances) {
+			if (instance->id == task->parentId) {
+				break;
+			}
+			parentIndex++;
+		}
+		// if parent found, we know the child task index == id
+		if (parentIndex < this->taskInstances.size()) {
+			this->taskInstances[parentIndex]->childItems[task->id].deleted = false;
+			this->taskInstances[parentIndex]->childItems[task->id].completed = false;
+			this->taskInstances[parentIndex]->childItems[task->id].completionDate = "";
+		}
+		// Reset also the parent instance in case it was already deleted/completed
+		this->taskInstances[parentIndex]->completed = false;
+		this->taskInstances[parentIndex]->completionDate = "";
+		this->taskInstances[parentIndex]->deleted = false;
+
+	}
+	this->save();
 }
 
 // Threading helpers
@@ -660,12 +795,12 @@ void InitializeAchievements(OrganizerRepository* repo) {
 				item.description = achievement.requirement;
 				item.type = ItemType::DAILY_ACHIEVEMENT;
 				switch (achievementEntry.first.id) {
-				case 261:
-				case 346:
-				case 365:
-					item.repeatMode = RepeatMode::WEEKLY; break;
-				default:
-					item.repeatMode = RepeatMode::DAILY;
+					case ACHIEVEMENT_GROUP_WEEKLY_FRACTALS:
+					case ACHIEVEMENT_GROUP_WVW:
+					case ACHIEVEMENT_GROUP_RIFTS:
+						item.repeatMode = RepeatMode::WEEKLY; break;
+					default:
+						item.repeatMode = RepeatMode::DAILY;
 				}
 				configurable->item = item;
 				repo->addApiTaskConfigurable(configurable);

@@ -11,6 +11,10 @@ void renderTaskConfiguration();
 void renderAPITasks();
 void renderStatistics();
 void renderSettings();
+/* List Proto*/
+bool renderTodoTaskRow(OrganizerItemInstance* task, bool isChild = false);
+bool renderTaskListRow(OrganizerItemInstance* task, bool isChild = false);
+bool renderCompletedTaskRow(OrganizerItemInstance* task, bool isChild = false);
 /* Misc rendering proto */
 void renderNewTaskDialog();
 
@@ -25,6 +29,8 @@ bool renderChangeInterval = false;
 
 bool showDeletedItems = false;
 bool showDeletedInstances = false;
+
+std::map<int, bool> subtasksVisible = std::map<int, bool>();
 
 OrganizerItem newItem = {};
 OrganizerItem* changeIntervalItem = nullptr;
@@ -71,6 +77,10 @@ Texture* iconSave = nullptr;
 Texture* iconCancel = nullptr;
 Texture* iconSubscribe = nullptr;
 Texture* iconPin = nullptr;
+Texture* iconList = nullptr;
+Texture* iconCollapse = nullptr;
+Texture* iconExpand = nullptr;
+
 
 /* Pagination */
 static const char* itemsPerPageComboItems[] = { "10", "25", "50" };
@@ -119,7 +129,12 @@ void Renderer::preRender() {
         iconSubscribe = APIDefs->Textures.Get("ICON_ORGANIZER_SUBSCRIBE");
     if (iconPin == nullptr)
         iconPin = APIDefs->Textures.Get("ICON_ORGANIZER_PIN");
-
+    if (iconList == nullptr)
+        iconList = APIDefs->Textures.Get("ICON_ORGANIZER_LIST");
+    if (iconCollapse == nullptr)
+        iconCollapse = APIDefs->Textures.Get("ICON_ORGANIZER_COLLAPSE");
+    if (iconExpand == nullptr)
+        iconExpand = APIDefs->Textures.Get("ICON_ORGANIZER_EXPAND");
 
     if (accountName.empty()) displayOwnOnly = false;
 }
@@ -474,122 +489,13 @@ void renderTodoList() {
 
                 auto tasklist = organizerRepo->getTaskInstances();
                 for (auto task : tasklist) {
-                    if (displayOwnOnly && !strContains(task->owner, accountName)) continue;
-                    if (task->completed || task->deleted) continue;
-                    OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
-                    if (item == nullptr) continue;
-                    if (item->deleted) continue;
+                    
 
-                    if (!tableFilter.empty()) {
-                        bool found = false;
-                        if (strContains(item->title, tableFilter)) found = true;
-                        if (strContains(item->description, tableFilter)) found = true;
-                        if (strContains(task->owner, tableFilter)) found = true;
-                        if (strContains(std::string(ItemTypeValue(item->type)), tableFilter)) found = true;
-                        if (strContains(task->startDate, tableFilter)) found = true;
-                        if (strContains(task->endDate, tableFilter)) found = true;
-
-                        if (!found) continue;
-                    }
-
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn(); // Interval buttons
-                    if (item->apiId.empty()) {
-                        // not a GW2 API Item => eligible for interval changes on the spot
-                        if (iconRepeat != nullptr) {
-                            ImGui::PushID(hashString("changeinterval_" + std::to_string(task->id)));
-                            ImTextureID buttonTex = item->repeatMode == RepeatMode::ONCE ? iconNoRepeat->Resource : iconRepeat->Resource;
-                            if (ImGui::ImageButton(buttonTex, imageButtonSize, { 0,0 }, { 1,1 })) {
-                                renderChangeInterval = true;
-                                changeIntervalPos = ImGui::GetMousePos();
-                                changeIntervalItem = item;
+                    if (renderTodoTaskRow(task)) {
+                        if (task->childItems.size() > 0 && subtasksVisible[task->id]) {
+                            for (auto child : task->childItems) {
+                                renderTodoTaskRow(&child, true);
                             }
-                            ImGui::PopID();
-                        }
-                        else {
-                            if (ImGui::Button("R", { 20,20 })) {
-                                renderChangeInterval = true;
-                                changeIntervalPos = ImGui::GetMousePos();
-                                changeIntervalItem = item;
-                            }
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            ImGui::BeginTooltip();
-                            ImGui::Text("Change repetition of this task");
-                            ImGui::EndTooltip();
-                        }
-                    }
-                    else {
-                        // GW2 API item, cannot change intervals on these, duh
-                        ImGui::Text("------");
-                        if (ImGui::IsItemHovered()) {
-                            ImGui::BeginTooltip();
-                            ImGui::Text("Can't edit intervals for tasks from the GW2 API!");
-                            ImGui::EndTooltip(); 
-                        }
-                    }
-
-                    ImGui::TableNextColumn(); // Title text
-                    if (task->endDate.empty()) {
-                        ImGui::Text(item->title.c_str());
-                    }
-                    else {
-                        DateTime dueDate = DateTime(task->endDate);
-                        if (dueDate.isBeforeNow()) {
-                            ImGui::TextColored(colorRed, item->title.c_str());
-                        }
-                        else {
-                            ImGui::Text(item->title.c_str());                            
-                        }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::BeginTooltip();
-                        ImGui::TextWrapped(item->description.c_str());
-
-                        ImGui::Text("");
-                        ImGui::Text(ItemTypeValue(item->type));
-                        ImGui::SameLine();
-                        ImGui::Text(" - ");
-                        ImGui::SameLine();
-                        ImGui::Text(RepeatModeValue(item->repeatMode));
-                        ImGui::Text(("Owner: " + replaceNewLines(task->owner)).c_str());
-                        if (!task->endDate.empty()) {
-                            DateTime endDate = DateTime(task->endDate);
-                            ImGui::Text(("Due: " + endDate.toStringNice()).c_str());
-                        }
-                        ImGui::EndTooltip();
-                    }
-
-                    ImGui::TableNextColumn(); // Finish button
-                    if (iconCheck != nullptr) {
-                        ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                            task->completionDate = DateTime::nowLocal().toString();
-                            task->completed = true;
-                            organizerRepo->save();
-                        }
-                        ImGui::PopID();
-                    }
-                    else {
-                        if (ImGui::Button(("C##" + std::to_string(task->id)).c_str(), {20,20})) {
-                            task->completionDate = DateTime::nowLocal().toString();
-                            task->completed = true;
-                            organizerRepo->save();
-                        }
-                    }
-                    ImGui::TableNextColumn(); // Delete button
-                    if (iconTrash != nullptr) {
-                        ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                            task->deleted = true;
-                            organizerRepo->save();
-                        }
-                        ImGui::PopID();
-                    }
-                    else {
-                        if (ImGui::Button(("D##" + std::to_string(task->id)).c_str(), { 20,20 })) {
-                            task->deleted = true;
-                            organizerRepo->save();
                         }
                     }
                 }
@@ -841,118 +747,12 @@ void renderCurrentTasks() {
         }
 
         for (auto task : organizerRepo->getTaskInstances()) {
-            if (task->completed || (task->deleted && !showDeletedInstances)) continue;
-            OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+            
 
-            if (!tableFilter.empty()) {
-                if (item == nullptr) continue;
-                bool found = false;
-                if (strContains(item->title, tableFilter)) found = true;
-                if (strContains(item->description, tableFilter)) found = true;
-                if (strContains(task->owner, tableFilter)) found = true;
-                if (strContains(std::string(ItemTypeValue(item->type)),tableFilter)) found = true;
-                if (strContains(task->startDate,tableFilter)) found = true;
-                if (strContains(task->endDate,tableFilter)) found = true;
-
-                if (!found) continue;
-            }
-
-            ImGui::TableNextRow();
-            if (task->deleted) {
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(colorGrey));
-            }
-
-            ImGui::TableNextColumn();
-            ImGui::TextWrapped(item == nullptr? "Unknown!" : item->title.c_str());
-            ImGui::TableNextColumn(); 
-            ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->description.c_str());
-            ImGui::TableNextColumn();
-            ImGui::TextWrapped(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
-            ImGui::TableNextColumn(); 
-            ImGui::Text(task->owner.c_str());
-            ImGui::TableNextColumn(); 
-            ImGui::Text(DateTime(task->startDate).toStringNiceNewline().c_str());
-            ImGui::TableNextColumn(); 
-            if (task->endDate.empty()) {
-                ImGui::Text("-");
-            }
-            else {
-                auto dueDate = DateTime(task->endDate);               
-                if (dueDate.isBeforeNow()) {
-                    ImGui::TextColored(colorRed, dueDate.toStringNiceNewline().c_str());
-                }
-                else {
-                    ImGui::Text(dueDate.toStringNiceNewline().c_str());
-                }
-            }
-            ImGui::TableNextColumn(); 
-            if (task->deleted) {
-                ImGui::Text("");
-            }
-            else {
-                // Finish button
-                if (iconCheck != nullptr) {
-                    ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                        task->completionDate = DateTime::nowLocal().toString();
-                        task->completed = true;
-                        organizerRepo->save();
-                    }
-                    ImGui::PopID();
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::BeginTooltip();
-                        ImGui::Text("Complete Task");
-                        ImGui::EndTooltip();
-                    }
-                }
-                else {
-                    if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), imageButtonSize)) {
-                        task->completionDate = DateTime::nowLocal().toString();
-                        task->completed = true;
-                        organizerRepo->save();
-                    }
-                }
-            }
-            ImGui::TableNextColumn(); // Delete button
-            if (task->deleted) {
-                if (iconReactivate != nullptr) {
-                    ImGui::PushID(hashString("react_" + std::to_string(task->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                        task->deleted = false;
-                        organizerRepo->save();
-                    }
-                    ImGui::PopID();
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::BeginTooltip();
-                        ImGui::Text("Restore Task");
-                        ImGui::EndTooltip();
-                    }
-                }
-                else {
-                    if (ImGui::Button(("Restore##" + std::to_string(task->id)).c_str())) {
-                        task->deleted = false;
-                        organizerRepo->save();
-                    }
-                }
-            }
-            else {
-                if (iconTrash != nullptr) {
-                    ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                    if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                        task->deleted = true;
-                        organizerRepo->save();
-                    }
-                    ImGui::PopID();
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::BeginTooltip();
-                        ImGui::Text("Delete Task");
-                        ImGui::EndTooltip();
-                    }
-                }
-                else {
-                    if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), imageButtonSize)) {
-                        task->deleted = true;
-                        organizerRepo->save();
+            if (renderTaskListRow(task)) {
+                if (task->childItems.size() > 0 && subtasksVisible[task->id]) {
+                    for (auto child : task->childItems) {
+                        renderTaskListRow(&child, true);
                     }
                 }
             }
@@ -1103,9 +903,17 @@ void renderAPITasks() {
                     ImGui::TableHeadersRow();
 
                     for (auto achievement : category.second) {
+                        std::string title = achievement.name;
+                        // Filter unnecessary fractal tasks
+                        if (category.first.id == ACHIEVEMENT_GROUP_DAILY_FRACTALS) {
+                            if (!title.starts_with("Daily Tier 4") && !title.starts_with("Daily Recommended Fractal"))
+                                continue;
+                            
+                            string_replace(title, "Tier 4 ", "");
+                        }
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::TextWrapped(achievement.name.c_str());
+                        ImGui::TextWrapped(title.c_str());
                         ImGui::TableNextColumn();
                         ImGui::TextWrapped(achievement.requirement.c_str());
                         ImGui::TableNextColumn();
@@ -1482,59 +1290,11 @@ void renderDoneTasks() {
             if (totalAvailableTasks <= startAtTaskCount) continue; // still data of previous page
             if (totalAvailableTasks > endAtTaskCount) continue; // data of next page
 
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->title.c_str());
-            ImGui::TableNextColumn(); 
-            ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->description.c_str());
-            ImGui::TableNextColumn(); 
-            ImGui::TextWrapped(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
-            ImGui::TableNextColumn(); 
-            ImGui::TextWrapped(task->owner.c_str());
-            ImGui::TableNextColumn(); 
-            ImGui::Text(DateTime(task->startDate).toStringNiceNewline().c_str());
-            ImGui::TableNextColumn(); 
-            ImGui::Text(DateTime(task->completionDate).toStringNiceNewline().c_str());
-            ImGui::TableNextColumn(); 
-            if (iconReactivate != nullptr) {
-                ImGui::PushID(hashString("react_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                    task->completed = false;
-                    task->completionDate = "";
-                    organizerRepo->save();
-                }
-                ImGui::PopID();
-                if (ImGui::IsItemHovered()) {
-                    ImGui::BeginTooltip();
-                    ImGui::Text("Reactivate Task");
-                    ImGui::EndTooltip();
-                }
-            }
-            else {
-                if (ImGui::Button(("Reactivate##" + std::to_string(task->id)).c_str())) {
-                    task->completed = false;
-                    task->completionDate = "";
-                    organizerRepo->save();
-                }
-            }
-            ImGui::TableNextColumn(); 
-            if (iconTrash != nullptr) {
-                ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
-                if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
-                    task->deleted = true;
-                    organizerRepo->save();
-                }
-                ImGui::PopID();
-                if (ImGui::IsItemHovered()) {
-                    ImGui::BeginTooltip();
-                    ImGui::Text("Delete Task");
-                    ImGui::EndTooltip();
-                }
-            }
-            else {
-                if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), { 20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
-                    task->deleted = true;
-                    organizerRepo->save();
+            if (renderCompletedTaskRow(task)) {
+                if (task->childItems.size() > 0 && subtasksVisible[task->id]) {
+                    for (auto child : task->childItems) {
+                        renderCompletedTaskRow(&child, true);
+                    }
                 }
             }
         }
@@ -2425,7 +2185,19 @@ void renderStatistics() {
         }
         if (allSelected) { // only continue if not already broken out earlier
             for (const auto& item : organizerRepo->getApiTaskConfigurables()) {
-                if (item->accountConfiguration.empty()) continue; // no API tasks that have 0 subscribers
+                // check if it is a subtask somewhere
+                bool isSubTask = false;
+                for (auto task : organizerRepo->getTaskInstances()) {
+                    if (task->childItems.empty()) continue;
+                    for (auto child : task->childItems) {
+                        if (child.itemId == item->item.id) {
+                            isSubTask = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (item->accountConfiguration.empty() && !isSubTask) continue; // no API tasks that have 0 subscribers
                 bool subscribed = false;
                 for (auto sub : item->accountConfiguration) {
                     if (sub.second) {
@@ -2433,7 +2205,7 @@ void renderStatistics() {
                         break;
                     }
                 }
-                if (!subscribed) continue; // not subscribed currently
+                if (!subscribed && !isSubTask) continue; // not subscribed currently
 
                 if (!statisticsFilter[item->item.id]) {
                     allSelected = false;
@@ -2449,7 +2221,9 @@ void renderStatistics() {
             }
         }
         ImGui::Separator();
-
+        ImGui::PushFont((ImFont*)NexusLink->FontBig);
+        ImGui::Text("Tasks");
+        ImGui::PopFont();
         for (auto item : organizerRepo->getConfigurableItems()) {
             bool selected = statisticsFilter[item->id];
 
@@ -2463,6 +2237,9 @@ void renderStatistics() {
             ImGui::PopTextWrapPos();
         }
         ImGui::Separator();
+        ImGui::PushFont((ImFont*)NexusLink->FontBig);
+        ImGui::Text("Subscriptions");
+        ImGui::PopFont();
         for (auto item : organizerRepo->getApiTaskConfigurables()) {
             if (item->accountConfiguration.empty()) continue; // no API tasks that have 0 subscribers
             bool subscribed = false;
@@ -2474,6 +2251,35 @@ void renderStatistics() {
             }
             if (!subscribed) continue; // not subscribed currently
 
+            bool selected = statisticsFilter[item->item.id];
+
+            // Start wrapping text
+            if (ImGui::Checkbox(("##checkbox" + std::to_string(item->item.id)).c_str(), &selected)) {
+                statisticsFilter[item->item.id] = selected;
+            }
+            ImGui::SameLine();
+            ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
+            ImGui::TextWrapped("%s", item->item.title.c_str()); // Display wrapped text
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::Separator();
+        ImGui::PushFont((ImFont*)NexusLink->FontBig);
+        ImGui::Text("Subtasks");
+        ImGui::PopFont();
+        for (auto item : organizerRepo->getApiTaskConfigurables()) {
+            // check if it is a subtask somewhere
+            bool isSubTask = false;
+            for (auto task : organizerRepo->getTaskInstances()) {
+                if (task->childItems.empty()) continue;
+                for (auto child : task->childItems) {
+                    if (child.itemId == item->item.id) {
+                        isSubTask = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!isSubTask) continue;
             bool selected = statisticsFilter[item->item.id];
 
             // Start wrapping text
@@ -2525,6 +2331,28 @@ void renderStatistics() {
             if (startDate > fixedEnd) continue;
             std::string startLabel = startDate.toStringNice().substr(0, 10);
             startedTasks[startLabel]++;
+
+            if (task->childItems.empty()) continue;
+            for (auto child : task->childItems) {
+                OrganizerItem* childItem = organizerRepo->getConfigurableItemById(child.itemId);
+                if (child.deleted) continue; // TODO possible override flag?
+                if (!statisticsFilter[childItem->id]) continue; // item filtered
+
+                // completion checks first
+                if (child.completed) {
+                    auto completionDate = DateTime(child.completionDate);
+                    if (completionDate > statisticsStart && completionDate < fixedEnd) {
+                        std::string endLabel = completionDate.toStringNice().substr(0, 10);
+                        completedTasks[endLabel]++;
+                    }
+                }
+
+                auto startDate = DateTime(child.startDate);
+                if (startDate < statisticsStart) continue;
+                if (startDate > fixedEnd) continue;
+                std::string startLabel = startDate.toStringNice().substr(0, 10);
+                startedTasks[startLabel]++;
+            }
         }
 
         BarChart("Started Tasks", startedTasks, NexusLink->Scaling, statisticsChartType);
@@ -2534,4 +2362,442 @@ void renderStatistics() {
 
         ImGui::EndChild();
     }
+}
+
+bool renderTodoTaskRow(OrganizerItemInstance* task, bool isChild) {
+    if (displayOwnOnly && !strContains(task->owner, accountName)) return false;
+    if (task->completed || task->deleted)  return false;
+    OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+    if (item == nullptr)  return false;
+    if (item->deleted)  return false;
+
+    if (!tableFilter.empty()) {
+        bool found = false;
+        if (strContains(item->title, tableFilter)) found = true;
+        if (strContains(item->description, tableFilter)) found = true;
+        if (strContains(task->owner, tableFilter)) found = true;
+        if (strContains(std::string(ItemTypeValue(item->type)), tableFilter)) found = true;
+        if (strContains(task->startDate, tableFilter)) found = true;
+        if (strContains(task->endDate, tableFilter)) found = true;
+
+        if (!found)  return false;
+    }
+
+    ImGui::TableNextRow();
+    if (isChild) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32({0.15f,0.27f,0.34f,1.0f}));
+    }
+    
+    ImGui::TableNextColumn(); // Interval buttons
+    if (item->apiId.empty()) {
+        // not a GW2 API Item => eligible for interval changes on the spot
+        if (iconRepeat != nullptr) {
+            ImGui::PushID(hashString("changeinterval_" + std::to_string(task->id)));
+            ImTextureID buttonTex = item->repeatMode == RepeatMode::ONCE ? iconNoRepeat->Resource : iconRepeat->Resource;
+            if (ImGui::ImageButton(buttonTex, imageButtonSize, { 0,0 }, { 1,1 })) {
+                renderChangeInterval = true;
+                changeIntervalPos = ImGui::GetMousePos();
+                changeIntervalItem = item;
+            }
+            ImGui::PopID();
+        }
+        else {
+            if (ImGui::Button("R", { 20,20 })) {
+                renderChangeInterval = true;
+                changeIntervalPos = ImGui::GetMousePos();
+                changeIntervalItem = item;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Change repetition of this task");
+            ImGui::EndTooltip();
+        }
+    }
+    else {
+        // GW2 API item, cannot change intervals on these, duh
+        ImGui::Text("------");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Can't edit intervals for tasks from the GW2 API!");
+            ImGui::EndTooltip();
+        }
+    }
+
+    ImGui::TableNextColumn(); // Title text
+    
+    // indent children
+    if (isChild) {
+        ImGui::Text("   ");
+        ImGui::SameLine();
+    }
+
+    float currentY = ImGui::GetCursorPosY();
+    float textHeight = ImGui::CalcTextSize("Test").y;
+    ImGui::SetCursorPosY(currentY + (imageButtonSize.y - textHeight) / 2);
+
+    if (!task->childItems.empty() && !isChild) {
+        // Move to the right side of the cell, leaving space for the button width
+        std::string taskToggleLabel = subtasksVisible[task->id] ? ("Hide Subtasks") : ("Show Subtasks");
+        ImGui::PushID(hashString(taskToggleLabel + "##" + std::to_string(task->id)));
+        Texture* texture = subtasksVisible[task->id] ? iconCollapse : iconExpand;
+        if (ImGui::ImageButton((ImTextureID)texture->Resource, {textHeight,textHeight}, {0,0}, {1,1})) {
+            subtasksVisible[task->id] = !subtasksVisible[task->id];
+        }
+        ImGui::PopID();
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text((taskToggleLabel).c_str());
+            ImGui::EndTooltip();
+        }
+        ImGui::SameLine();
+    }
+
+    std::string title = item == nullptr ? "Unknown!" : item->title;
+    string_replace(title, "Tier 1 ", "");
+
+    if (task->endDate.empty()) {
+        ImGui::Text(title.c_str());
+    }
+    else {
+        DateTime dueDate = DateTime(task->endDate);
+        if (dueDate.isBeforeNow()) {
+            ImGui::TextColored(colorRed, title.c_str());
+        }
+        else {
+            ImGui::Text(title.c_str());
+        }
+    }
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::TextWrapped(item->description.c_str());
+
+        ImGui::Text("");
+        ImGui::Text(ItemTypeValue(item->type));
+        ImGui::SameLine();
+        ImGui::Text(" - ");
+        ImGui::SameLine();
+        ImGui::Text(RepeatModeValue(item->repeatMode));
+        ImGui::Text(("Owner: " + replaceNewLines(task->owner)).c_str());
+        if (!task->endDate.empty()) {
+            DateTime endDate = DateTime(task->endDate);
+            ImGui::Text(("Due: " + endDate.toStringNice()).c_str());
+        }
+        ImGui::EndTooltip();
+    }
+
+
+    if (!task->childItems.empty() && !isChild) {
+        if (iconList) {
+            ImGui::SameLine();
+            ImGui::Image((ImTextureID)iconList->Resource, {textHeight, textHeight});
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("This Task has Subtasks. Click the button on the left to expand.");
+                ImGui::EndTooltip();
+            }
+        }
+    }
+
+    ImGui::TableNextColumn(); // Finish button
+    if (iconCheck != nullptr) {
+        std::string id = isChild ? std::format("{}_{}", std::to_string(task->parentId), std::to_string(task->id)) : std::to_string(task->id);
+        ImGui::PushID(hashString("finish_" + id));
+        if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+            organizerRepo->CompleteTask(task);
+        }
+        ImGui::PopID();
+    }
+    else {
+        if (ImGui::Button(("C##" + std::to_string(task->id)).c_str(), { 20,20 })) {
+            organizerRepo->CompleteTask(task);
+        }
+    }
+    ImGui::TableNextColumn(); // Delete button
+    if (iconTrash != nullptr) {
+        std::string id = isChild ? std::format("{}_{}", std::to_string(task->parentId), std::to_string(task->id)) : std::to_string(task->id);
+        ImGui::PushID(hashString("remove_" + id));
+        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+            organizerRepo->DeleteTask(task);
+        }
+        ImGui::PopID();
+    }
+    else {
+        if (ImGui::Button(("D##" + std::to_string(task->id)).c_str(), { 20,20 })) {
+            task->deleted = true;
+            organizerRepo->save();
+        }
+    }
+
+    return true;
+}
+bool renderTaskListRow(OrganizerItemInstance* task, bool isChild) {
+    if (task->completed || (task->deleted && !showDeletedInstances)) return false;
+    OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+
+    if (!tableFilter.empty()) {
+        if (item == nullptr) return false;
+        bool found = false;
+        if (strContains(item->title, tableFilter)) found = true;
+        if (strContains(item->description, tableFilter)) found = true;
+        if (strContains(task->owner, tableFilter)) found = true;
+        if (strContains(std::string(ItemTypeValue(item->type)), tableFilter)) found = true;
+        if (strContains(task->startDate, tableFilter)) found = true;
+        if (strContains(task->endDate, tableFilter)) found = true;
+
+        if (!found) return false;
+    }
+
+    ImGui::TableNextRow();
+    if (isChild) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32({ 0.15f,0.27f,0.34f,1.0f }));
+    } else if (task->deleted) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(colorGrey));
+    }
+
+    ImGui::TableNextColumn();
+    // indent children
+    if (isChild) {
+        ImGui::Text("   ");
+        ImGui::SameLine();
+    }
+    float currentY = ImGui::GetCursorPosY();
+    float textHeight = ImGui::CalcTextSize("Test").y;
+    
+    if (!task->childItems.empty() && !isChild) {
+        // Move to the right side of the cell, leaving space for the button width
+        std::string taskToggleLabel = subtasksVisible[task->id] ? ("Hide Subtasks") : ("Show Subtasks");
+        ImGui::PushID(hashString(taskToggleLabel + "##organizer_" + std::to_string(task->id)));
+        Texture* texture = subtasksVisible[task->id] ? iconCollapse : iconExpand;
+        if (ImGui::ImageButton((ImTextureID)texture->Resource, { textHeight,textHeight }, { 0,0 }, { 1,1 })) {
+            subtasksVisible[task->id] = !subtasksVisible[task->id];
+        }
+        ImGui::PopID();
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text((taskToggleLabel).c_str());
+            ImGui::EndTooltip();
+        }
+        ImGui::SameLine();
+    }
+
+    std::string title = item == nullptr ? "Unknown!" : item->title;
+    string_replace(title, "Tier 1 ", "");
+
+    ImGui::TextWrapped(title.c_str());
+    if (!task->childItems.empty() && !isChild) {
+        if (iconList) {
+            ImGui::SameLine();
+            ImGui::Image((ImTextureID)iconList->Resource, { textHeight, textHeight });
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("This Task has Subtasks. Click the button on the left to expand.");
+                ImGui::EndTooltip();
+            }
+        }
+    }
+
+    ImGui::TableNextColumn();
+    ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->description.c_str());
+    ImGui::TableNextColumn();
+    ImGui::TextWrapped(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
+    ImGui::TableNextColumn();
+    ImGui::Text(task->owner.c_str());
+    ImGui::TableNextColumn();
+    ImGui::Text(DateTime(task->startDate).toStringNiceNewline().c_str());
+    ImGui::TableNextColumn();
+    if (task->endDate.empty()) {
+        ImGui::Text("-");
+    }
+    else {
+        auto dueDate = DateTime(task->endDate);
+        if (dueDate.isBeforeNow()) {
+            ImGui::TextColored(colorRed, dueDate.toStringNiceNewline().c_str());
+        }
+        else {
+            ImGui::Text(dueDate.toStringNiceNewline().c_str());
+        }
+    }
+    ImGui::TableNextColumn();
+    if (task->deleted) {
+        ImGui::Text("");
+    }
+    else {
+        // Finish button
+        if (iconCheck != nullptr) {
+            ImGui::PushID(hashString("finish_" + std::to_string(task->id)));
+            if (ImGui::ImageButton((ImTextureID)iconCheck->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+                organizerRepo->CompleteTask(task);
+            }
+            ImGui::PopID();
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Complete Task");
+                ImGui::EndTooltip();
+            }
+        }
+        else {
+            if (ImGui::Button(("Fin##" + std::to_string(task->id)).c_str(), imageButtonSize)) {
+                organizerRepo->CompleteTask(task);
+            }
+        }
+    }
+    ImGui::TableNextColumn(); // Delete button
+    if (task->deleted) {
+        if (iconReactivate != nullptr) {
+            ImGui::PushID(hashString("react_" + std::to_string(task->id)));
+            if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+                organizerRepo->RestoreTask(task);
+            }
+            ImGui::PopID();
+            
+        }
+        else {
+            if (ImGui::Button(("Restore##" + std::to_string(task->id)).c_str())) {
+                organizerRepo->RestoreTask(task);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Restore Task");
+            ImGui::EndTooltip();
+        }
+    }
+    else {
+        if (iconTrash != nullptr) {
+            ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
+            if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+                organizerRepo->DeleteTask(task);
+            }
+            ImGui::PopID();
+        }
+        else {
+            if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), imageButtonSize)) {
+                organizerRepo->DeleteTask(task);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Delete Task");
+            ImGui::EndTooltip();
+        }
+    }
+    return true;
+}
+bool renderCompletedTaskRow(OrganizerItemInstance* task, bool isChild) {
+    if (!task->completed || task->deleted) return false;
+    OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+    if (item->deleted) return false;
+
+    if (!tableFilter.empty()) {
+        if (item == nullptr) return false;
+        bool found = false;
+        if (strContains(item->title, tableFilter)) found = true;
+        if (strContains(item->description, tableFilter)) found = true;
+        if (strContains(task->owner, tableFilter)) found = true;
+        if (strContains(std::string(ItemTypeValue(item->type)), tableFilter)) found = true;
+        if (strContains(task->startDate, tableFilter)) found = true;
+        if (strContains(task->endDate, tableFilter)) found = true;
+
+        if (!found) return false;
+    }
+
+    ImGui::TableNextRow();
+    if (isChild) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32({ 0.15f,0.27f,0.34f,1.0f }));
+    }
+    else if (task->deleted) {
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(colorGrey));
+    }
+
+    ImGui::TableNextColumn();
+    // indent children
+    if (isChild) {
+        ImGui::Text("   ");
+        ImGui::SameLine();
+    }
+
+    float currentY = ImGui::GetCursorPosY();
+    float textHeight = ImGui::CalcTextSize("Test").y;
+
+    if (!task->childItems.empty() && !isChild) {
+        // Move to the right side of the cell, leaving space for the button width
+        std::string taskToggleLabel = subtasksVisible[task->id] ? ("Hide Subtasks") : ("Show Subtasks");
+        ImGui::PushID(hashString(taskToggleLabel + "##organizer_" + std::to_string(task->id)));
+        Texture* texture = subtasksVisible[task->id] ? iconCollapse : iconExpand;
+        if (ImGui::ImageButton((ImTextureID)texture->Resource, { textHeight,textHeight }, { 0,0 }, { 1,1 })) {
+            subtasksVisible[task->id] = !subtasksVisible[task->id];
+        }
+        ImGui::PopID();
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text((taskToggleLabel).c_str());
+            ImGui::EndTooltip();
+        }
+        ImGui::SameLine();
+    }
+    std::string title = item == nullptr ? "Unknown!" : item->title;
+    string_replace(title, "Tier 1 ", "");
+
+    ImGui::TextWrapped(title.c_str());
+    if (!task->childItems.empty() && !isChild) {
+        if (iconList) {
+            ImGui::SameLine();
+            ImGui::Image((ImTextureID)iconList->Resource, { textHeight, textHeight });
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("This Task has Subtasks. Click the button on the left to expand.");
+                ImGui::EndTooltip();
+            }
+        }
+    }
+
+    ImGui::TableNextColumn();
+    ImGui::TextWrapped(item == nullptr ? "Unknown!" : item->description.c_str());
+    ImGui::TableNextColumn();
+    ImGui::TextWrapped(item == nullptr ? "Unknown!" : ItemTypeValue(item->type));
+    ImGui::TableNextColumn();
+    ImGui::TextWrapped(task->owner.c_str());
+    ImGui::TableNextColumn();
+    ImGui::Text(DateTime(task->startDate).toStringNiceNewline().c_str());
+    ImGui::TableNextColumn();
+    ImGui::Text(DateTime(task->completionDate).toStringNiceNewline().c_str());
+    ImGui::TableNextColumn();
+    if (iconReactivate != nullptr) {
+        ImGui::PushID(hashString("react_" + std::to_string(task->id)));
+        if (ImGui::ImageButton((ImTextureID)iconReactivate->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+            organizerRepo->RestoreTask(task);
+        }
+        ImGui::PopID();
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Reactivate Task");
+            ImGui::EndTooltip();
+        }
+    }
+    else {
+        if (ImGui::Button(("Reactivate##" + std::to_string(task->id)).c_str())) {
+            organizerRepo->RestoreTask(task);
+        }
+    }
+    ImGui::TableNextColumn();
+    if (iconTrash != nullptr) {
+        ImGui::PushID(hashString("remove_" + std::to_string(task->id)));
+        if (ImGui::ImageButton((ImTextureID)iconTrash->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
+            organizerRepo->DeleteTask(task);
+        }
+        ImGui::PopID();
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Delete Task");
+            ImGui::EndTooltip();
+        }
+    }
+    else {
+        if (ImGui::Button(("Del##" + std::to_string(task->id)).c_str(), { 20 * NexusLink->Scaling,20 * NexusLink->Scaling })) {
+            organizerRepo->DeleteTask(task);
+        }
+    }
+    return true;
 }

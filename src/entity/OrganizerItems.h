@@ -121,10 +121,13 @@ struct OrganizerItemInstance {
 
 	bool deleted;
 
+	std::vector<OrganizerItemInstance> childItems;
+	int parentId;
+
 	//temp
 	bool hasEndDate;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItemInstance, id, owner, itemId, startDate, endDate, completed, completionDate, notified, deleted);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItemInstance, id, owner, itemId, startDate, endDate, completed, completionDate, notified, deleted, childItems, parentId);
 
 struct ApiTaskConfigurable {
 	OrganizerItem item;

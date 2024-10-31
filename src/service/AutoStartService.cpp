@@ -222,6 +222,10 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             newInstance.completed = false;
             newInstance.itemId = item->id;
             newInstance.owner = account;
+
+            // Speciality - Task Instance Groups! yaaaay!
+            // TODO at a later point, phew.
+
             organizerRepo->addTaskInstance(new OrganizerItemInstance(newInstance));
             APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Created task '" + item->title + "' for account " + account).c_str());
         }
@@ -272,6 +276,74 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
             newInstance.endDate = nextReset.toString(); newInstance.completed = false;
             newInstance.itemId = apiTask->item.id;
             newInstance.owner = account;
+
+            // New Speciality: Task Instance Groups for API Tasks! YAY!
+            // We test for:
+            // - tasks that start with originalId = achievement_group_ => Achievement Group, start all tasks of that group (TODO filters for fraccies)
+            // - dungeon & raids: check for if originalId is contained in their constants translator map; if yes, it's a task group, start all instances!
+            if (apiTask->originalId.starts_with("achievement_group_")) {
+                // TODO some filtering for some of the categories probably
+                // Like, we don't need Tier 1,2,3,4 Fractal for the same fractal dungeon i.e. Thaumanova - "Daily Thaumanova" would be enough
+                for (auto achievementGroup : organizerRepo->achievements) {
+                    if (std::to_string(achievementGroup.first.id) != apiTask->item.apiId) continue; // take item.apiId because in "originalId" it has a prefix
+                    for (auto achievement : achievementGroup.second) {
+                        // find the fitting task configuration
+                        ApiTaskConfigurable* taskconfig = organizerRepo->getApiTaskConfigurableByOriginalId(std::format("achievement_single_{}",std::to_string(achievement.id)));
+                        if (taskconfig) {
+
+                            // omega filtering for tasks like fractals
+                            if (achievementGroup.first.id == ACHIEVEMENT_GROUP_DAILY_FRACTALS) {
+                                std::string title = taskconfig->item.title;
+                                if (!title.starts_with("Daily Tier 1") && !title.starts_with("Daily Recommended Fractal"))
+                                    continue;
+                            }
+
+                            OrganizerItemInstance subInstance = {};
+                            subInstance.startDate = DateTime::nowLocal().toString();
+                            subInstance.endDate = nextReset.toString(); newInstance.completed = false;
+                            subInstance.itemId = taskconfig->item.id;
+                            subInstance.owner = account;
+                            newInstance.childItems.push_back(subInstance);
+                        }
+                    }
+                }
+            }
+            else if (dungeonTranslator.contains(apiTask->originalId)) {
+                for (auto dungeon : organizerRepo->dungeons) {
+                    if (dungeon.id != apiTask->originalId) continue;
+                    for (auto path : dungeon.paths) {
+                        ApiTaskConfigurable* taskconfig = organizerRepo->getApiTaskConfigurableByOriginalId(path.id);
+                        if (taskconfig) {
+                            OrganizerItemInstance subInstance = {};
+                            subInstance.startDate = DateTime::nowLocal().toString();
+                            subInstance.endDate = nextReset.toString(); newInstance.completed = false;
+                            subInstance.itemId = taskconfig->item.id;
+                            subInstance.owner = account;
+                            newInstance.childItems.push_back(subInstance);
+                        }
+                    }
+                }
+            }
+            else if (raidTranslator.contains(apiTask->originalId)) {
+                for (auto raid : organizerRepo->raids) {
+                    for (auto wing : raid.wings) {
+                        if (wing.id != apiTask->originalId) continue;
+                        for (auto event : wing.events) {
+                            ApiTaskConfigurable* taskconfig = organizerRepo->getApiTaskConfigurableByOriginalId(event.id);
+                            if (taskconfig) {
+                                OrganizerItemInstance subInstance = {};
+                                subInstance.startDate = DateTime::nowLocal().toString();
+                                subInstance.endDate = nextReset.toString(); newInstance.completed = false;
+                                subInstance.itemId = taskconfig->item.id;
+                                subInstance.owner = account;
+                                newInstance.childItems.push_back(subInstance);
+                            }
+                        }
+                    }
+                    
+                }
+            }
+
             organizerRepo->addTaskInstance(new OrganizerItemInstance(newInstance));
             APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Created task '" + apiTask->item.title + "' for account " + account).c_str());
         }

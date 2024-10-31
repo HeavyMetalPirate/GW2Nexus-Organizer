@@ -82,9 +82,9 @@ extern "C" __declspec(dllexport) AddonDefinition* GetAddonDef()
 	AddonDef.APIVersion = NEXUS_API_VERSION;
 	AddonDef.Name = "Organizer";
 	AddonDef.Version.Major = 0;
-	AddonDef.Version.Minor = 3;
-	AddonDef.Version.Build = 2;
-	AddonDef.Version.Revision = 1;
+	AddonDef.Version.Minor = 4;
+	AddonDef.Version.Build = 0;
+	AddonDef.Version.Revision = 0;
 	AddonDef.Author = "Heavy Metal Pirate.2695";
 	AddonDef.Description = "Tools to help you stay organized throughout Tyria.";
 	AddonDef.Load = AddonLoad;
@@ -147,6 +147,9 @@ void AddonLoad(AddonAPI* aApi)
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_CANCEL", IDB_ICON_CANCEL, hSelf, nullptr);
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_SUBSCRIBE", IDB_ICON_SUBSCRIBE, hSelf, nullptr);
 	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_PIN", IDB_ICON_PIN, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_LIST", IDB_ICON_LIST, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_EXPAND", IDB_ICON_EXPAND, hSelf, nullptr);
+	APIDefs->Textures.LoadFromResource("ICON_ORGANIZER_COLLAPSE", IDB_ICON_COLLAPSE, hSelf, nullptr);
 
 
 	APIDefs->InputBinds.RegisterWithString("ORG_KEYBIND", ProcessKeybind, "ALT+K");
