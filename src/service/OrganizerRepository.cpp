@@ -27,6 +27,18 @@ bool OrganizerRepository::firstInitializeDone() {
 	return true;
 }
 
+void OrganizerRepository::reset() {
+	this->accountProgressInitialized = false;
+	this->dungeons.clear();
+	this->raids.clear();
+	this->mapchests.chests.clear();
+	this->worldbosses.worldbosses.clear();
+	this->dailycraft.recipes.clear();
+	this->achievements.clear();
+
+	this->initialize();
+}
+
 void OrganizerRepository::initialize() {
 	try {
 		// Get addon directory

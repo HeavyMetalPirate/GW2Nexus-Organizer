@@ -31,6 +31,9 @@ private:
 	void CreateTasksForAccount(RepeatMode mode, std::string account);
 
 	void CheckNotifications();
+
+	void ResetRolloverPause(RepeatMode mode);
+
 	/*
 	std::chrono::system_clock::time_point getLastDailyReset() const;
 	std::chrono::system_clock::time_point getLastWeeklyReset() const;

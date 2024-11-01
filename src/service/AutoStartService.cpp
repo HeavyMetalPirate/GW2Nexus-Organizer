@@ -37,15 +37,34 @@ void AutoStartService::endWorker() {
     if (initializer.joinable()) initializer.join();
 }
 
+void AutoStartService::ResetRolloverPause(RepeatMode mode) {
+    // Sleep for a while to let the GW2 API roll over
+    for (int i = 0; i < 300000; i++) {
+        Sleep(1);
+        if (unloading || !running) return;
+    }
+    // save current state just in case
+    organizerRepo->save();
+    // Reset organizerRepo to load new data in hopefully
+    organizerRepo->reset();
+    // Sleep for a while so organizerRepo can initialize
+    while (!organizerRepo->firstInitializeDone()) {
+        Sleep(1);
+        if (unloading || !running) return;
+    }
+}
+
 void AutoStartService::CheckResetTimes() {
     while (running) {
         if (!organizerRepo->firstInitializeDone()) continue;
         
         if (CheckDailyReset()) {
+            ResetRolloverPause(RepeatMode::DAILY);
             PerformDailyReset();
             std::this_thread::sleep_for(std::chrono::minutes(1)); // Avoid triggering multiple times within the same minute
         }
         if (CheckWeeklyReset()) {
+            ResetRolloverPause(RepeatMode::WEEKLY);
             PerformWeeklyReset();
             std::this_thread::sleep_for(std::chrono::minutes(1)); // Avoid triggering multiple times within the same minute
         }

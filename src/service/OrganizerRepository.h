@@ -23,6 +23,7 @@ public:
 	/// </summary>
 	void initialize();
 	void unload();
+	void reset();
 
 	/// <summary>
 	/// Function to save data to storage
