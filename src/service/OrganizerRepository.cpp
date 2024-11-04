@@ -36,6 +36,9 @@ void OrganizerRepository::reset() {
 	this->dailycraft.recipes.clear();
 	this->achievements.clear();
 
+	this->accounts.clear();
+	this->progressionPerAccount.clear();
+
 	this->initialize();
 }
 
@@ -52,7 +55,18 @@ void OrganizerRepository::initialize() {
 				dataFile.close();
 				
 				std::vector<OrganizerItem> config = jsonData;
-				for (auto item : config) configurableItems.push_back(new OrganizerItem(item));
+				if (!this->configurableItems.empty()) {
+					// pre-clear
+					this->configurableItems.clear();
+				}
+				for (auto item : config) {
+					auto it = std::find_if(configurableItems.begin(), configurableItems.end(),
+						[&item](OrganizerItem* existing) {
+							return existing->id == item.id;
+						});
+					if (it != configurableItems.end()) continue; // item already exists, continue to avoid id collision
+					configurableItems.push_back(new OrganizerItem(item));
+				}
 			}
 		}
 
@@ -66,7 +80,18 @@ void OrganizerRepository::initialize() {
 				dataFile.close();
 
 				std::vector<OrganizerItemInstance> config = jsonData;
-				for (auto item : config) taskInstances.push_back(new OrganizerItemInstance(item));
+				if (!this->taskInstances.empty()) {
+					// pre-clear
+					this->taskInstances.clear();
+				}
+				for (auto item : config) {
+					auto it = std::find_if(taskInstances.begin(), taskInstances.end(),
+						[&item](OrganizerItemInstance* existing) {
+							return existing->id == item.id;
+						});
+					if (it != taskInstances.end()) continue; // item already exists, continue to avoid id collision
+					taskInstances.push_back(new OrganizerItemInstance(item));
+				}
 			}
 		}
 
@@ -80,7 +105,18 @@ void OrganizerRepository::initialize() {
 				dataFile.close();
 
 				std::vector<ApiTaskConfigurable> config = jsonData;
-				for (auto item : config) apiTaskConfigurables.push_back(new ApiTaskConfigurable(item));
+				if (!this->apiTaskConfigurables.empty()) {
+					// pre-clear
+					this->apiTaskConfigurables.clear();
+				}
+				for (auto item : config) {
+					auto it = std::find_if(apiTaskConfigurables.begin(), apiTaskConfigurables.end(),
+						[&item](ApiTaskConfigurable* existing) {
+							return existing->item.id == item.item.id;
+						});
+					if (it != apiTaskConfigurables.end()) continue; // item already exists, continue to avoid id collision
+					apiTaskConfigurables.push_back(new ApiTaskConfigurable(item));
+				}
 			}
 		}
 		// InitializerThreads
