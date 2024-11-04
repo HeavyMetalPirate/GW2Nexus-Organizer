@@ -49,6 +49,9 @@ public:
 			OrganizerItem* itemA = getConfigurableItemById(a->itemId);
 			OrganizerItem* itemB = getConfigurableItemById(b->itemId);
 
+			if (itemA == nullptr) return false;
+			if (itemB == nullptr) return false;
+
 			std::string valueA, valueB;
 			switch (property) {
 			case SortProperty::NAME:

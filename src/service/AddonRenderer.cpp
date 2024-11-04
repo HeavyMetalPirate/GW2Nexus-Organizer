@@ -1271,6 +1271,7 @@ void renderDoneTasks() {
         for (auto task : organizerRepo->getTaskInstances()) {
             if (!task->completed || task->deleted) continue;
             OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+            if (item == nullptr) continue;
             if (item->deleted) continue;
 
             if (!tableFilter.empty()) {
@@ -2314,6 +2315,7 @@ void renderStatistics() {
 
         for (auto task : organizerRepo->getTaskInstances()) {
             OrganizerItem* item = organizerRepo->getConfigurableItemById(task->itemId);
+            if (item == nullptr) continue; // orphaned
             if (task->deleted) continue; // TODO possible override flag?
             if (!statisticsFilter[item->id]) continue; // item filtered
 
