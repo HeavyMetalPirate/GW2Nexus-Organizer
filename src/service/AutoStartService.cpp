@@ -9,6 +9,12 @@ std::tm getUTCTime(std::time_t time) {
 void AutoStartService::initialize() {
     initRunning = true;
     initializer = std::thread([&] {
+        // Wait a couple for arcdps to give us the account name if possible
+        for (int i = 0; i < 15000; i++) {
+            Sleep(1);
+            if (unloading || !running) return;
+        }
+
         // Wait for organizerRepo to complete init so we have all configured accounts
 #ifndef NDEBUG
         APIDefs->Log(ELogLevel_TRACE, ADDON_NAME, "Waiting for OrganizerRepository to complete first init loop...");

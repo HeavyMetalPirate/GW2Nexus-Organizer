@@ -832,7 +832,9 @@ void renderAPITasks() {
                         for (auto objective : progress.second.objectives) {
                             ImGui::TableNextRow();
                             ImGui::TableNextColumn();
-                            ImGui::TextWrapped(objective.title.c_str());
+                            std::string title = objective.title;
+                            title = sanitize_string(title);
+                            ImGui::TextWrapped(title.c_str());
                             ImGui::TableNextColumn();
                             ImGui::Text(objective.track.c_str());
                             ImGui::TableNextColumn();
@@ -859,7 +861,9 @@ void renderAPITasks() {
                             for (auto objective : weeklyProgress.objectives) {
                                 ImGui::TableNextRow();
                                 ImGui::TableNextColumn();
-                                ImGui::TextWrapped(objective.title.c_str());
+                                std::string title = objective.title;
+                                title = sanitize_string(title);
+                                ImGui::TextWrapped(title.c_str());
                                 ImGui::TableNextColumn();
                                 ImGui::Text(objective.track.c_str());
                                 ImGui::TableNextColumn();
@@ -913,6 +917,7 @@ void renderAPITasks() {
                         }
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
+                        title = sanitize_string(title);
                         ImGui::TextWrapped(title.c_str());
                         ImGui::TableNextColumn();
                         ImGui::TextWrapped(achievement.requirement.c_str());
@@ -2234,7 +2239,9 @@ void renderStatistics() {
             }
             ImGui::SameLine();
             ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
-            ImGui::TextWrapped("%s", item->title.c_str()); // Display wrapped text
+            std::string title = item->title.c_str();
+            title = sanitize_string(title);
+            ImGui::TextWrapped("%s", title); // Display wrapped text
             ImGui::PopTextWrapPos();
         }
         ImGui::Separator();
@@ -2260,7 +2267,9 @@ void renderStatistics() {
             }
             ImGui::SameLine();
             ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
-            ImGui::TextWrapped("%s", item->item.title.c_str()); // Display wrapped text
+            std::string title = item->item.title;
+            title = sanitize_string(title);
+            ImGui::TextWrapped("%s", title.c_str()); // Display wrapped text
             ImGui::PopTextWrapPos();
         }
         ImGui::Separator();
@@ -2289,7 +2298,9 @@ void renderStatistics() {
             }
             ImGui::SameLine();
             ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
-            ImGui::TextWrapped("%s", item->item.title.c_str()); // Display wrapped text
+            std::string title = item->item.title;
+            title = sanitize_string(title);
+            ImGui::TextWrapped("%s", title.c_str()); // Display wrapped text
             ImGui::PopTextWrapPos();
         }
         ImGui::EndChild();
@@ -2457,6 +2468,7 @@ bool renderTodoTaskRow(OrganizerItemInstance* task, bool isChild) {
 
     std::string title = item == nullptr ? "Unknown!" : item->title;
     string_replace(title, "Tier 1 ", "");
+    title = sanitize_string(title);
 
     if (task->endDate.empty()) {
         ImGui::Text(title.c_str());
@@ -2586,6 +2598,7 @@ bool renderTaskListRow(OrganizerItemInstance* task, bool isChild) {
 
     std::string title = item == nullptr ? "Unknown!" : item->title;
     string_replace(title, "Tier 1 ", "");
+    title = sanitize_string(title);
 
     ImGui::TextWrapped(title.c_str());
     if (!task->childItems.empty() && !isChild) {
@@ -2741,6 +2754,7 @@ bool renderCompletedTaskRow(OrganizerItemInstance* task, bool isChild) {
     }
     std::string title = item == nullptr ? "Unknown!" : item->title;
     string_replace(title, "Tier 1 ", "");
+    title = sanitize_string(title);
 
     ImGui::TextWrapped(title.c_str());
     if (!task->childItems.empty() && !isChild) {
