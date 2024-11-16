@@ -2239,9 +2239,9 @@ void renderStatistics() {
             }
             ImGui::SameLine();
             ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 140 * NexusLink->Scaling);
-            std::string title = item->title.c_str();
+            std::string title = item->title;
             title = sanitize_string(title);
-            ImGui::TextWrapped("%s", title); // Display wrapped text
+            ImGui::TextWrapped("%s", title.c_str()); // Display wrapped text
             ImGui::PopTextWrapPos();
         }
         ImGui::Separator();
