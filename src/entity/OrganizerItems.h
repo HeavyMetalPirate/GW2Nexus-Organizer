@@ -102,10 +102,11 @@ struct OrganizerItem {
 	int dueMinutes;
 
 	std::map<std::string, bool> accountConfiguration;
+	std::map<std::string, std::string> accountConfigurationUntil;
 
 	bool deleted;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItem, id, apiId, title, description, type, repeatMode, intervalMode, daysOfWeek, daysOfMonth, dueHours, dueMinutes, accountConfiguration, deleted);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OrganizerItem, id, apiId, title, description, type, repeatMode, intervalMode, daysOfWeek, daysOfMonth, dueHours, dueMinutes, accountConfiguration, accountConfigurationUntil, deleted);
 
 struct OrganizerItemInstance {
 	int id;

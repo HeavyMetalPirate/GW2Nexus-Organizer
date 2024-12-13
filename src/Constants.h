@@ -148,7 +148,8 @@ static const std::map<std::string, std::string> raidTranslator = {
 	{"bastion_of_the_penitent","Bastion of the Penitent"},
 	{"hall_of_chains","Hall of Chains"},
 	{"mythwright_gambit","Mythwright Gambit"},
-	{"the_key_of_ahdashim","The Key of Adashim"}
+	{"the_key_of_ahdashim","The Key of Adashim"},
+	{"mount_balrior", "Mount Balrior"}
 };
 static const std::map<std::string, std::string> raidBossesTranslator = {
 	{"vale_guardian", "Vale Guardian"},
@@ -176,7 +177,11 @@ static const std::map<std::string, std::string> raidBossesTranslator = {
 	{"gate","Gate of Adashim"},
 	{"adina","Cardinal Adina"},
 	{"sabir", "Cardinal Sabir"},
-	{"qadim_the_peerless", "Qadim the Peerless"}
+	{"qadim_the_peerless", "Qadim the Peerless"},
+	{"camp", "Clear the Base Camp"},
+	{"greer", "Greer, the Blightbringer"},
+	{"decima", "Decima, the Stormsinger"},
+	{"ura", "Ura, the Steamshrieker"}
 };
 
 #endif

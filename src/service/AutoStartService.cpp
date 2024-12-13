@@ -182,6 +182,18 @@ void AutoStartService::CreateTasksForAccount(RepeatMode mode, std::string accoun
         if (account != "Everyone" && !item->accountConfiguration.contains(account)) continue; // no subscription data
         if (account != "Everyone" && !item->accountConfiguration[account]) continue; // not subscribed on that account
 
+        // check subscription until, and if met, set accountConfiguration to false and subUntil empty
+        if (item->accountConfigurationUntil.contains(account) && !item->accountConfigurationUntil[account].empty()) {
+            auto subUntil = DateTime(item->accountConfigurationUntil[account]);
+            if (subUntil.isBeforeNow()) {
+                item->accountConfiguration[account] = false;
+                item->accountConfigurationUntil[account] = "";
+                organizerRepo->save();
+                APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Subscription to Task '" + item->title + "' completed for account " + account + " - skipping creation.").c_str());
+                continue;
+            }
+        }
+
         if (mode == RepeatMode::CUSTOM) {
             // check if today is *the* day
             if (!item->daysOfWeek.empty()) {

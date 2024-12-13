@@ -30,6 +30,8 @@ bool renderChangeInterval = false;
 bool showDeletedItems = false;
 bool showDeletedInstances = false;
 
+bool editItemSubscriptionUntil = false;
+
 std::map<int, bool> subtasksVisible = std::map<int, bool>();
 
 OrganizerItem newItem = {};
@@ -1357,7 +1359,7 @@ void renderTaskConfiguration() {
     int startAtTaskCount = (configCurrentPage - 1) * configItemsPerPage;
     int endAtTaskCount = configCurrentPage * configItemsPerPage;
 
-    if (ImGui::BeginTable("ConfigurableItemsTable", 8, ImGuiTableFlags_Sortable | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable)) {
+    if (ImGui::BeginTable("ConfigurableItemsTable", 9, ImGuiTableFlags_Sortable | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable)) {
         ImGui::TableSetupColumn("Title", ImGuiTableColumnFlags_WidthFixed, 200.0f);
         ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthFixed, 200.0f);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 100.0f);
@@ -1366,6 +1368,7 @@ void renderTaskConfiguration() {
         ImGui::TableSetupColumn("##StartTask", ImGuiTableColumnFlags_WidthFixed, 25.0f);
         ImGui::TableSetupColumn("##EditTask", ImGuiTableColumnFlags_WidthFixed, 25.0f);
         ImGui::TableSetupColumn("##Delete", ImGuiTableColumnFlags_WidthFixed, 25.0f);
+        ImGui::TableSetupColumn("Active Until", ImGuiTableColumnFlags_WidthFixed, 100.0f);
 
         ImGui::TableHeadersRow();
 
@@ -1756,6 +1759,7 @@ void renderTaskConfiguration() {
                             item->daysOfWeek = editItem->daysOfWeek;
                             item->dueHours = editItem->dueHours;
                             item->dueMinutes = editItem->dueMinutes;
+                            item->accountConfigurationUntil = editItem->accountConfigurationUntil;
                             
                             editItem = nullptr;
                             organizerRepo->save();
@@ -1778,6 +1782,7 @@ void renderTaskConfiguration() {
                             item->daysOfWeek = editItem->daysOfWeek;
                             item->dueHours = editItem->dueHours;
                             item->dueMinutes = editItem->dueMinutes;
+                            item->accountConfigurationUntil = editItem->accountConfigurationUntil;
 
                             editItem = nullptr;
                             organizerRepo->save();
@@ -1795,6 +1800,12 @@ void renderTaskConfiguration() {
                         ImGui::PushID(hashString("edit_" + std::to_string(item->id)));
                         if (ImGui::ImageButton((ImTextureID)iconEdit->Resource, imageButtonSize, { 0,0 }, { 1,1 })) {
                             editItem = new OrganizerItem(*item);
+                            if (item->repeatMode != RepeatMode::ONCE && item->accountConfigurationUntil.contains(accountName)) {
+                                editItemSubscriptionUntil = true;
+                            }
+                            else {
+                                editItemSubscriptionUntil = false;
+                            }
                         }
                         ImGui::PopID();
                         if (ImGui::IsItemHovered()) {
@@ -1806,6 +1817,12 @@ void renderTaskConfiguration() {
                     else {
                         if (ImGui::Button(("Edit##" + std::to_string(item->id)).c_str())) {
                             editItem = new OrganizerItem(*item);
+                            if (item->repeatMode != RepeatMode::ONCE && item->accountConfigurationUntil.contains(accountName)) {
+                                editItemSubscriptionUntil = true;
+                            }
+                            else {
+                                editItemSubscriptionUntil = false;
+                            }
                         }
                     }
                 }
@@ -1876,6 +1893,54 @@ void renderTaskConfiguration() {
             }
             else {
 
+            }
+            ImGui::TableNextColumn(); // Subscriptions until
+            if (editItem == nullptr || editItem->id != item->id) {
+                if (item->repeatMode == RepeatMode::ONCE) {
+                    ImGui::Text("-"); // No subscription possible
+                }
+                else {
+                    if (!item->accountConfiguration.contains(accountName) || !item->accountConfiguration[accountName]) {
+                        ImGui::Text("-");
+                    }
+                    else if (!item->accountConfigurationUntil.contains(accountName) || item->accountConfigurationUntil[accountName].empty()) {
+                        ImGui::Text("Not defined");
+                    }
+                    else {
+                        ImGui::Text(DateTime(item->accountConfigurationUntil[accountName]).toStringNiceNewline().c_str());
+                    }
+                }
+            }
+            else {
+                if (editItem->repeatMode == RepeatMode::ONCE) {
+                    ImGui::Text("-"); // No subscription possible
+                }
+                if (!editItem->accountConfiguration.contains(accountName) || !editItem->accountConfiguration[accountName]) {
+                    ImGui::Text("-");
+                }
+                else {
+                    if (editItemSubscriptionUntil) {
+                        // cancel button
+                        if (ImGui::Button("Cancel Subscription End")) {
+                            editItemSubscriptionUntil = false;
+                            editItem->accountConfigurationUntil[accountName] = "";
+                        }
+                        // calendar picker
+                        std::string dateStr = editItem->accountConfigurationUntil[accountName];
+                        if (dateStr.empty()) {
+                            dateStr = DateTime().nowLocal().toString();
+                        }
+                        if (DateTimePicker(("SubscriptionUntil##" + std::to_string(editItem->id)).c_str(), dateStr)) {
+                            editItem->accountConfigurationUntil[accountName] = dateStr;
+                            APIDefs->Log(ELogLevel_INFO, ADDON_NAME, ("Set Subscription Until to: " + dateStr).c_str());
+                        }
+                    }
+                    else {
+                        if (ImGui::Button("Set Subscription End")) {
+                            editItemSubscriptionUntil = true;
+                        }
+                    }
+                }
             }
         }
         ImGui::EndTable();
